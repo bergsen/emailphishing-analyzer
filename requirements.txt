@@ -1,0 +1,14 @@
+flask
+flask-limiter
+pypdf
+python-dotenv
+requests
+python-whois
+idna
+google-generativeai
+urllib3
+bleach
+scikit-learn
+pandas
+kagglehub
+weasyprint

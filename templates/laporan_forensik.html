@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laporan - Analisis Email</title>
+    <style>
+        /* ── BASE: Hitam Putih Forensik ── */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            font-size: 11pt;
+            color: #111;
+            background: #fff;
+            line-height: 1.5;
+        }
+        
+        .page {
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 20mm 18mm;
+        }
+
+        /* ── HEADER DOKUMEN ── */
+        .doc-header {
+            text-align: center;
+            border-bottom: 3px double #111;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .doc-header h1 {
+            font-size: 16pt;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .doc-header .doc-sub {
+            font-size: 9pt;
+            color: #555;
+        }
+
+        /* ── META INFO BOX ── */
+        .meta-box {
+            border: 1px solid #333;
+            padding: 10px 14px;
+            margin-bottom: 20px;
+            font-size: 9.5pt;
+        }
+        .meta-box table { width: 100%; border: none; }
+        .meta-box td { padding: 2px 6px; border: none; vertical-align: top; }
+        .meta-box .label { font-weight: bold; width: 160px; color: #333; }
+
+        /* ── SECTION ── */
+        .section {
+            margin-bottom: 18px;
+            page-break-inside: avoid; /* Menghindari section terpotong di tengah */
+        }
+        .section-title {
+            font-size: 11pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 2px solid #111;
+            padding-bottom: 4px;
+            margin-bottom: 10px;
+            page-break-after: avoid;
+        }
+        .section-num {
+            display: inline-block;
+            background: #111;
+            color: #fff;
+            padding: 1px 8px;
+            margin-right: 6px;
+            font-size: 10pt;
+        }
+
+        /* ── TABLE ── */
+        table.forensic {
+            width: 100%;
+            table-layout: fixed; /* PENTING: Memaksa tabel tidak melar keluar halaman */
+            border-collapse: collapse;
+            margin-bottom: 10px;
+            font-size: 9.5pt;
+            page-break-inside: auto;
+        }
+        table.forensic th, table.forensic td {
+            border: 1px solid #555;
+            padding: 5px 8px;
+            text-align: left;
+            vertical-align: top;
+            word-wrap: break-word; /* PENTING: Memaksa URL panjang turun ke bawah */
+            overflow-wrap: break-word;
+        }
+        table.forensic th {
+            background: #e8e8e8;
+            font-weight: bold;
+        }
+        table.forensic tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+        table.forensic tr:nth-child(even) td {
+            background: #f8f8f8;
+        }
+
+        /* ── STATUS BOX ── */
+        .verdict-box {
+            border: 2px solid #111;
+            padding: 12px 16px;
+            text-align: center;
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+        .verdict-box .verdict-label {
+            font-size: 14pt;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .verdict-box .verdict-score {
+            font-size: 11pt;
+            margin-top: 2px;
+        }
+
+        /* ── FLAG BADGE ── */
+        .flag-item {
+            display: inline-block;
+            border: 1px solid #555;
+            padding: 2px 8px;
+            margin: 2px 4px 2px 0;
+            font-size: 8.5pt;
+            border-radius: 3px;
+            background: #f4f4f4;
+        }
+
+        /* ── MONO TEXT ── */
+        .mono { font-family: 'Courier New', monospace; font-size: 9pt; }
+        .break-all { word-break: break-all; }
+
+        /* ── CLASS ANTI-TERPOTONG (TAMBAHAN BARU) ── */
+        .avoid-break {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+
+        /* ── BUTTONS (no-print) ── */
+        .btn-back {
+            display: inline-block;
+            padding: 8px 18px;
+            font-size: 10pt;
+            font-weight: bold;
+            text-decoration: none;
+            border: 2px solid #111;
+            background: #fff;
+            color: #111;
+            cursor: pointer;
+            transition: 0.15s;
+            margin-bottom: 20px;
+        }
+        .btn-back:hover {
+            background: #111;
+            color: #fff;
+        }
+        .btn-download {
+            display: block;
+            width: 100%;
+            max-width: 340px;
+            margin: 25px auto 0;
+            padding: 14px 24px;
+            font-size: 11pt;
+            font-weight: bold;
+            text-align: center;
+            border: 3px solid #111;
+            background: #111;
+            color: #fff;
+            cursor: pointer;
+            transition: 0.2s;
+            letter-spacing: 0.5px;
+        }
+        .btn-download:hover {
+            background: #fff;
+            color: #111;
+        }
+        .btn-download.generating {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        /* ── FOOTER ── */
+        .doc-footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 2px solid #111;
+            font-size: 8.5pt;
+            color: #555;
+            text-align: center;
+            page-break-inside: avoid;
+        }
+
+        /* ── KELAS KHUSUS SAAT CETAK PDF (JS TRIGGER) ── */
+        .pdf-generating {
+            padding: 0 !important;
+            margin: 0 !important;
+            max-width: 100% !important;
+            box-shadow: none !important;
+        }
+
+        /* ── SCREEN ONLY ── */
+        @media screen {
+            body { background: #e0e0e0; }
+            .page {
+                background: #fff;
+                box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+                margin-top: 20px;
+                margin-bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="page" id="main-container">
+
+    <a href="javascript:window.close()" class="btn-back no-print">&#10006; Tutup Halaman Halaman Ini</a>
+
+    <div id="print-area">
+        <div class="doc-header">
+            <h1>Laporan Hasil Email Threat Analisis</h1>
+            <div style="font-size: 11pt; font-weight: bold; margin-bottom: 4px;">Email Threat Analisis</div>
+        </div>
+
+        <div class="meta-box">
+            <table>
+                <tr>
+                    <td class="label">No. Laporan:</td>
+                    <td><span class="mono" id="report-id"></span></td>
+                    <td class="label">Tanggal Cetak:</td>
+                    <td><span id="report-date"></span></td>
+                </tr>
+                <tr>
+                    <td class="label">Sumber File:</td>
+                    <td>{{ file_info.name }}</td>
+                    <td class="label">Metode Analisis:</td>
+                    <td>Header Auth, URL Struct, RAG, OSINT, LLM</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="section">
+            <div class="section-title"><span class="section-num">1</span>Ringkasan Eksekutif</div>
+            <div class="verdict-box">
+                <div class="verdict-label">KEPUTUSAN: {{ risk_details.status }}</div>
+                <div class="verdict-score">
+                    Skor Risiko: {{ risk_details.score }} / 100
+                    {% if risk_details.bonus is defined and risk_details.bonus != 0 %}
+                    &nbsp;|&nbsp; Bonus Legitimasi: {{ risk_details.bonus }}
+                    {% endif %}
+                </div>
+            </div>
+
+            <p style="margin-bottom: 8px;"><strong>Rekomendasi AI:</strong></p>
+            <p style="margin-bottom: 10px; padding: 8px; border: 1px solid #ccc; background: #fafafa;">{{ risk_details.saran }}</p>
+
+            <p style="margin-bottom: 6px;"><strong>Alasan Penilaian:</strong></p>
+            <ol style="margin-left: 20px; font-size: 10pt;">
+                {% if not risk_details.rincian %}
+                <li>Tidak ditemukan indikator berbahaya yang menonjol.</li>
+                {% endif %}
+                {% for alasan in risk_details.rincian %}
+                <li>{{ alasan }}</li>
+                {% endfor %}
+            </ol>
+        </div>
+
+        <div class="section">
+            <div class="section-title"><span class="section-num">2</span>Rincian Skor &amp; Indikator Pemicu</div>
+            <p style="font-size: 9pt; margin-bottom: 8px; color: #555;">
+                <strong>Formula:</strong> S_total = max(min(S_A + S_B + S_C + S_D + BONUS, 100), 0)
+            </p>
+            {% if risk_details.breakdown %}
+            {% for key, comp in risk_details.breakdown.items() %}
+            <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed #ccc;">
+                <div style="display: flex; justify-content: space-between;">
+                    <strong>{{ key }} &mdash; {{ comp.label }}</strong>
+                    <span>
+                        {% if key == 'BONUS' %}{{ comp.score }}
+                        {% elif key == 'PENALTI' %}+{{ comp.score }}
+                        {% else %}{{ comp.score }} / {{ comp.max }}{% endif %}
+                    </span>
+                </div>
+                {% if comp.flags %}
+                <div style="margin-top: 4px;">
+                    {% for flag in comp.flags %}
+                    <span class="flag-item">{{ flag.label }} ({% if flag.weight < 0 %}{{ flag.weight }}{% else %}+{{ flag.weight }}{% endif %})</span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div style="font-size: 9pt; color: #555; margin-top: 2px;">[v] Aman - Tidak ada flag terpicu</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <div class="section-title"><span class="section-num">3</span>[S_A] Analisis Identitas Pengirim (Email Spoofing)</div>
+            <table class="forensic">
+                <tr><th style="width:30%;">Parameter</th><th style="width:35%;">Data</th><th style="width:35%;">Status</th></tr>
+                
+                <tr>
+                    <td>Klaim Pengirim (From)</td>
+                    <td class="mono break-all">{{ spoof_analysis.from_header }}</td>
+                    <td>-</td>
+                </tr>
+
+                <tr>
+                    <td>Subjek & Status Pesan</td>
+                    <td colspan="2">
+                        <div style="margin-bottom: 6px;"><strong>Subjek:</strong> {{ spoof_analysis.subject_header | default('Tidak Ada Subjek') }}</div>
+                        
+                        {% if spoof_analysis.is_forwarded %}
+                            <div style="border: 1px dashed #333; padding: 8px; background: #fafafa; margin-top: 4px;">
+                                <strong style="font-size: 1.05em;">[!] PERHATIAN: EMAIL TERUSAN (FORWARDED)</strong>
+                                <div style="margin-top: 4px;">
+                                    Pengirim Asli: <strong class="mono">{{ spoof_analysis.original_sender | default('Tidak ditemukan di teks') }}</strong>
+                                </div>
+                                
+                                {% if spoof_analysis.forward_indicators %}
+                                <div style="margin-top: 6px; font-size: 8.5pt;">
+                                    <strong>Log Ekstraksi Forensik:</strong>
+                                    <ul style="margin: 2px 0 0 15px; padding: 0;">
+                                        {% for indicator in spoof_analysis.forward_indicators %}
+                                            <li class="mono">{{ indicator }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+
+                                <div style="margin-top: 8px; font-size: 8pt; color: #555;">
+                                    *Catatan: Status SPF/DKIM/DMARC di bawah ini adalah milik akun penerus, BUKAN pengirim asli. Autentikasi tidak berlaku untuk pesan asli.
+                                </div>
+                            </div>
+                        {% else %}
+                            <strong>[v] EMAIL LANGSUNG</strong>
+                        {% endif %}
+                    </td>
+                </tr>
+
+                <tr>
+                    <td>Jalur Balasan (Return-Path)</td>
+                    <td class="mono break-all">{{ spoof_analysis.return_path }}</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td>Kesamaan Domain</td>
+                    <td>From: <strong>{{ spoof_analysis.from_domain }}</strong><br>Return: <strong>{{ spoof_analysis.return_domain }}</strong></td>
+                    <td>{% if spoof_analysis.domain_mismatch %}[!] TIDAK COCOK{% else %}[v] COCOK{% endif %}</td>
+                </tr>
+                {% if spoof_analysis.reply_to %}
+                <tr>
+                    <td>Reply-To</td>
+                    <td class="mono break-all">{{ spoof_analysis.reply_to }}</td>
+                    <td>{% if spoof_analysis.reply_to_mismatch %}[!] TIDAK COCOK dengan From{% else %}[v] COCOK{% endif %}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td>SPF</td>
+                    <td>{{ spoof_analysis.spf_status | upper }}</td>
+                    <td>
+                        {% if spoof_analysis.spf_status == 'pass' %}[v] PASS{% elif spoof_analysis.spf_status == 'missing' %}[-] TIDAK ADA{% else %}[!] GAGAL ({{ spoof_analysis.spf_status }}){% endif %}
+                        <div style="font-size:8.5pt; color:#555;">{{ spoof_analysis.spf_explanation }}</div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>DKIM</td>
+                    <td>{{ spoof_analysis.dkim_status | upper }}</td>
+                    <td>
+                        {% if spoof_analysis.dkim_status == 'pass' %}[v] PASS{% elif spoof_analysis.dkim_status == 'missing' %}[-] TIDAK ADA{% else %}[!] GAGAL ({{ spoof_analysis.dkim_status }}){% endif %}
+                        <div style="font-size:8.5pt; color:#555;">{{ spoof_analysis.dkim_explanation }}</div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>DMARC</td>
+                    <td>{{ spoof_analysis.dmarc_status | upper }}</td>
+                    <td>
+                        {% if spoof_analysis.dmarc_status == 'pass' %}[v] PASS{% elif spoof_analysis.dmarc_status == 'missing' %}[-] TIDAK ADA{% else %}[!] GAGAL ({{ spoof_analysis.dmarc_status }}){% endif %}
+                        <div style="font-size:8.5pt; color:#555;">{{ spoof_analysis.dmarc_explanation }}</div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Log Autentikasi</td>
+                    <td colspan="2">
+                        <div style="margin-bottom:4px;">Kesimpulan: <strong>{{ spoof_analysis.auth_summary }}</strong></div>
+                        <div class="mono" style="font-size:8pt; background:#f4f4f4; padding:6px; border-left:3px solid #555;">{{ spoof_analysis.auth_results | default('-') }}</div>
+                    </td>
+                </tr>
+                {% if spoof_analysis.x_mailer %}
+                <tr>
+                    <td>X-Mailer</td>
+                    <td class="mono">{{ spoof_analysis.x_mailer }}</td>
+                    <td>{% if spoof_analysis.suspicious_mailer %}[!] MENCURIGAKAN{% else %}[v] Normal{% endif %}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td>Jejak Pengiriman (Hops)</td>
+                    <td colspan="2">
+                        <div style="margin-bottom:4px;">Total Rute: <strong>{{ spoof_analysis.received_hop_count }}</strong> server perantara.</div>
+                        {% if spoof_analysis.received_hop_count > 0 %}
+                        <table class="forensic" style="margin:0;">
+                            <tr><th>Hop</th><th>Server</th><th>Status</th></tr>
+                            {% for hop in spoof_analysis.received_chain %}
+                            <tr>
+                                <td>{{ hop.index }}</td>
+                                <td class="mono break-all">{{ hop.from_server | default('N/A', true) }}</td>
+                                <td>{% if hop.suspicious %}[!] ANOMALI - {{ hop.reason }}{% else %}[v] NORMAL{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                        {% else %}
+                        <div>[-] Tidak ada jejak pengiriman.</div>
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="section">
+            <div class="section-title"><span class="section-num">4</span>[S_B] Analisis Struktur Tautan (URL)</div>
+            {% if url_analysis %}
+            {% for link in url_analysis %}
+            <div class="avoid-break" style="margin-bottom:12px; padding:8px; border:1px solid #aaa;">
+                <div style="margin-bottom:4px;"><strong>URL #{{ loop.index }}</strong> &mdash; Risiko: <strong>{{ link.risk_level }}</strong></div>
+                <div class="mono break-all" style="font-size:8.5pt; background:#f4f4f4; padding:4px 6px; margin-bottom:6px;">{{ link.url[:250] }}</div>
+                <table class="forensic" style="margin:0;">
+                    <tr><td style="width:35%;">Domain</td><td class="mono"><strong>{{ link.domain }}</strong></td></tr>
+                    <tr><td>URL Encoding</td><td>{% if link.encoded %}[!] Terdeteksi &mdash; {{ link.encoded_chars }}{% else %}[v] Tidak ada{% endif %}</td></tr>
+                    <tr><td>Punycode / IDN</td><td>{% if link.punycode %}[!] Homograph Attack &mdash; visual: {{ link.punycode_decoded }}{% else %}[v] Tidak terdeteksi{% endif %}</td></tr>
+                    <tr><td>Cyrillic</td><td>{% if link.cyrillic %}[!] Karakter Cyrillic: {{ link.cyrillic_chars }}{% else %}[v] Tidak terdeteksi{% endif %}</td></tr>
+                    <tr><td>URL Shortener</td><td>{% if link.shortlink %}[!] {{ link.shortener_used }}{% else %}[v] URL langsung{% endif %}</td></tr>
+                    {% if link.has_dangerous_file or link.has_macro_file %}
+                    <tr><td>Ekstensi File</td><td>{% if link.has_dangerous_file %}[!] Berbahaya: {{ link.dangerous_extension }}{% endif %}{% if link.has_macro_file %} [!] Bermakro: {{ link.macro_extension }}{% endif %}</td></tr>
+                    {% endif %}
+                    {% if link.deceptive_subdomain %}
+                    <tr><td>Subdomain Palsu</td><td>[!] Brand "{{ link.impersonated_brand }}" &mdash; domain asli: {{ link.real_domain }}</td></tr>
+                    {% endif %}
+                    {% if link.is_data_uri %}<tr><td>Data URI</td><td>[!] Konten di-embed dalam URL</td></tr>{% endif %}
+                    {% if link.is_javascript_uri %}<tr><td>JavaScript URI</td><td>[!] Kode JS di-embed dalam URL</td></tr>{% endif %}
+                </table>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p style="color:#555;">Tidak ada tautan ditemukan dalam email.</p>
+            {% endif %}
+        </div>
+
+        {% if attachment_analysis and attachment_analysis.total_count > 0 %}
+        <div class="section">
+            <div class="section-title"><span class="section-num">5</span>[S_B] Analisis Attachment ({{ attachment_analysis.total_count }} file)</div>
+            <table class="forensic">
+                <tr><th>Nama File</th><th>Ukuran</th><th>Tipe</th><th>Hash SHA-256</th><th>Risiko</th></tr>
+                {% for att in attachment_analysis.attachments %}
+                <tr>
+                    <td class="break-all">{{ att.filename }}</td>
+                    <td>{{ att.size_display }}</td>
+                    <td class="mono">{{ att.content_type }}</td>
+                    <td class="mono" style="font-size:7.5pt;">{{ att.hash_sha256_short }}</td>
+                    <td>
+                        <strong>{{ att.risk_level }}</strong>
+                        {% if att.risk_reasons %}<br><span style="font-size:8.5pt;">{{ att.risk_reasons|join(', ') }}</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        {% endif %}
+
+       <div class="section">
+            <div class="section-title"><span class="section-num">6</span>[S_C] Analisis Keyword Konten Trik Psikologis Social Engineering</div>
+            {% if content_analysis %}
+            <table class="forensic">
+                <tr><th>Kategori</th><th>Terdeteksi</th><th>Jumlah</th><th>Kata Kunci</th></tr>
+                
+                {% set se_tactics = ['urgency', 'fear', 'authority', 'reward', 'secrecy', 'credential_request', 'pretexting', 'baiting', 'scarcity', 'social_proof', 'curiosity', 'intimidation', 'impersonation', 'emotional_manipulation'] %}
+                
+                {% set detected_count = 0 %}
+                
+                {% for tactic in se_tactics %}
+                    {% if content_analysis[tactic] and content_analysis[tactic].detected %}
+                        <tr>
+                            <td>{{ content_analysis[tactic].label }}</td>
+                            <td style="color: #c62828; font-weight: bold;">[!] Ya</td>
+                            <td>{{ content_analysis[tactic].count }}</td>
+                            <td>{{ content_analysis[tactic].matches | join(', ') }}</td>
+                        </tr>
+                        {% set detected_count = detected_count + 1 %}
+                    {% endif %}
+                {% endfor %}
+
+                {% if content_analysis.total_indicators == 0 %}
+                <tr>
+                    <td colspan="4" style="text-align: center; color: #2e7d32; font-weight: bold; padding: 10px;">
+                        [v] Tidak Terdeteksi Adanya Taktik Rekayasa Sosial
+                    </td>
+                </tr>
+                {% endif %}
+
+                {% if content_analysis.link_text_mismatch and content_analysis.link_text_mismatch.detected %}
+                <tr>
+                    <td>Link-Text Mismatch</td>
+                    <td style="color: #c62828; font-weight: bold;">[!] Ya</td>
+                    <td>{{ content_analysis.link_text_mismatch.count }}</td>
+                    <td>Teks link berbeda dari tujuan sebenarnya</td>
+                </tr>
+                {% endif %}
+            </table>
+            
+            <div style="margin-top:6px; font-size:9.5pt;">
+                <strong>Kesimpulan Risiko Konten:</strong> {{ content_analysis.risk_summary }}
+                {% if content_analysis.legitimate_signals is defined and content_analysis.legitimate_signals > 0 %}
+                &nbsp;|&nbsp; <strong>{{ content_analysis.legitimate_signals }}</strong> pola legitimate terdeteksi
+                {% endif %}
+            </div>
+            {% else %}
+            <p style="color:#555;">Tidak ada analisis konten tersedia.</p>
+            {% endif %}
+        </div>
+
+        {% if rag_context and (rag_context.similar_patterns or rag_context.se_tactics) %}
+        <div class="section">
+            <div class="section-title"><span class="section-num">7</span>[S_C] Analisis Persamaan Pola Email Serupa</div>
+            {% if rag_context.top_match and rag_context.top_match.similarity > 0.001 %}
+            {% set tm = rag_context.top_match %}
+            <table class="forensic">
+                <tr><th style="width:30%;">Field</th><th>Value</th></tr>
+                <tr><td>Top Match ID</td><td><strong>{{ tm.id }}</strong></td></tr>
+                <tr><td>Kategori</td><td>{{ tm.category }}</td></tr>
+                <tr><td>Similarity</td><td><strong>{{ tm.similarity_pct }}%</strong></td></tr>
+                <tr><td>Taktik</td><td>{{ tm.tactic }}</td></tr>
+                <tr><td>Deskripsi</td><td>{{ tm.description }}</td></tr>
+            </table>
+            {% elif rag_context.similar_patterns %}
+            {% set p = rag_context.similar_patterns[0] %}
+            <table class="forensic">
+                <tr><th style="width:30%;">Field</th><th>Value</th></tr>
+                <tr><td>Pattern ID</td><td><strong>{{ p.id|default('KB') }}</strong></td></tr>
+                <tr><td>Kategori</td><td>{{ p.category }}</td></tr>
+                <tr><td>Similarity</td><td><strong>{{ (p.similarity * 100)|round(2) }}%</strong></td></tr>
+                <tr><td>Taktik</td><td>{{ p.tactic }}</td></tr>
+                <tr><td>Deskripsi</td><td>{{ p.description }}</td></tr>
+            </table>
+            {% endif %}
+            {% if rag_context.is_whitelisted %}
+            <div style="margin-top:8px; padding:6px; border:1px solid #555;">
+                [v] Domain pengirim termasuk dalam whitelist layanan email resmi.
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="section">
+            <div class="section-title"><span class="section-num">8</span>[S_D] Reputasi Domain (OSINT)</div>
+            {% set domains_to_show = all_domain_info if all_domain_info else [domain_info] %}
+            {% for di in domains_to_show %}
+            {% set is_problematic = (di.virustotal_positives|default(0) > 0) or (di.abuseipdb_score|default(0) > 0) or (di.urlscan_is_malicious|default(false)) or (di.shodan_vulns|default([])|length > 0) %}
+            <div class="avoid-break" style="margin-bottom:12px; padding:8px; border:1px solid #aaa;">
+                <div style="margin-bottom:6px;">
+                    <strong>Domain: {{ di.domain }}</strong>
+                    &mdash; {% if is_problematic %}[!] BERMASALAH{% else %}[v] BERSIH{% endif %}
+                </div>
+                <table class="forensic" style="margin:0 0 6px 0;">
+                    <tr><td style="width:30%;">IP Address</td><td class="mono">{{ di.ip_address | default('-') }}</td></tr>
+                    <tr><td>ISP / Lokasi</td><td>{{ di.isp | default('-') }} ({{ di.country | default('-') }})</td></tr>
+                    <tr>
+                        <td>Umur Domain</td>
+                        <td>{% if di.domain_age != '-' %}{{ di.domain_age }} Hari ({{ di.whois_status }}){% else %}Gagal ditarik ({{ di.whois_status }}){% endif %}</td>
+                    </tr>
+                    <tr><td>Tanggal Dibuat</td><td>{{ di.creation_date | default('-') }}</td></tr>
+                </table>
+                <table class="forensic" style="margin:0;">
+                    <tr><th>Tool</th><th>Hasil</th><th>Detail</th></tr>
+                    <tr>
+                        <td>VirusTotal</td>
+                        <td>
+                            {% if di.vt_error %}Kendala: {{ di.vt_error }}
+                            {% elif di.virustotal_checked %}
+                                {% if di.virustotal_positives > 0 %}[!] TERDETEKSI ({{ di.virustotal_positives }} engine){% else %}[v] Bersih{% endif %}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>AbuseIPDB</td>
+                        <td>
+                            {% if di.abuseipdb_error %}Kendala: {{ di.abuseipdb_error }}
+                            {% elif di.abuseipdb_checked %}
+                                {% if di.abuseipdb_score > 0 %}[!] Skor: {{ di.abuseipdb_score }}%, {{ di.abuseipdb_reports }} laporan{% else %}[v] Bersih (0%){% endif %}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>URLScan.io</td>
+                        <td>
+                            {% if di.urlscan_error %}Kendala: {{ di.urlscan_error }}
+                            {% elif di.urlscan_checked %}
+                                {% if di.urlscan_is_malicious %}[!] MALICIOUS{% else %}[v] Bersih{% endif %}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Shodan</td>
+                        <td>
+                            {% if di.shodan_checked | default(false) %}
+                                {% if di.shodan_vulns | default([]) | length > 0 %}[!] {{ di.shodan_vulns|length }} kerentanan{% else %}[v] Aman{% endif %}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td style="font-size:8.5pt;">
+                            {% if di.shodan_checked | default(false) %}
+                            Port: {{ di.shodan_ports | default([]) | join(', ') or '-' }}
+                            {% if di.shodan_vulns | default([]) %}<br>CVE: {{ di.shodan_vulns[:3] | join(', ') }}{% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="section">
+            <div class="section-title"><span class="section-num">9</span>[S_D] Pelacakan Tujuan Asli Tautan (Redirect Trace)</div>
+            {% if redirect_results %}
+            {% for rr in redirect_results %}
+            <div class="avoid-break" style="margin-bottom:10px;">
+                <div style="font-size:9pt; margin-bottom:4px;">Sumber: <span class="mono break-all">{{ rr.source_url[:120] }}</span></div>
+                <table class="forensic">
+                    <tr><th>Langkah</th><th>URL Tujuan</th><th>Status</th></tr>
+                    {% for r in rr.chain %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td class="mono break-all" style="font-size:8.5pt;">{{ r.url[:180] }}</td>
+                        <td>
+                            {{ r.status }}
+                            {% if r.cross_domain %}<br><span style="font-size:8.5pt;">[!] Lintas Domain</span>{% endif %}
+                            {% if r.explanation %}<div style="font-size:8pt; color:#555;">{{ r.explanation }}</div>{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p style="color:#555;">Tidak ada data redirect.</p>
+            {% endif %}
+        </div>
+
+        {% if email_preview %}
+        <div class="section">
+            <div class="section-title"><span class="section-num">10</span>Preview Konten Email</div>
+            <div class="mono" style="font-size:8.5pt; background:#f4f4f4; padding:10px; border:1px solid #aaa; max-height:none; line-height:1.4; white-space:pre-wrap; word-break:break-word;">{{ email_preview.text_content | striptags }}</div>
+        </div>
+        {% endif %}
+
+        <div class="doc-footer" id="doc-footer">
+            Dokumen ini dihasilkan secara otomatis oleh Email Phishing Analyzer.<br>
+            Laporan bersifat informatif dan bukan merupakan keputusan hukum final.<br>
+            <span id="footer-date"></span>
+        </div>
+    </div> <button class="btn-download no-print" id="btn-unduh" onclick="unduhPDF()">
+        &#11015; Unduh Laporan PDF
+    </button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
+<script>
+    // Generate report ID & date
+    var now = new Date();
+    var rid = 'EPH-' + now.getFullYear()
+        + String(now.getMonth()+1).padStart(2,'0')
+        + String(now.getDate()).padStart(2,'0') + '-'
+        + String(now.getHours()).padStart(2,'0')
+        + String(now.getMinutes()).padStart(2,'0')
+        + String(now.getSeconds()).padStart(2,'0');
+    document.getElementById('report-id').textContent = rid;
+    
+    var dateStr = now.toLocaleString('id-ID', {
+        weekday:'long', year:'numeric', month:'long', day:'numeric',
+        hour:'2-digit', minute:'2-digit', second:'2-digit'
+    });
+    document.getElementById('report-date').textContent = dateStr;
+    document.getElementById('footer-date').textContent = 'Dicetak pada: ' + dateStr;
+
+    // Fungsi unduh PDF menggunakan html2pdf.js
+    function unduhPDF() {
+        var btn = document.getElementById('btn-unduh');
+        btn.textContent = 'Sedang membuat PDF...';
+        btn.classList.add('generating');
+        btn.disabled = true;
+
+        // Ambil elemen parent & elemen yang mau di-print
+        var wrapper = document.getElementById('main-container');
+        var printArea = document.getElementById('print-area');
+
+        // Tambahkan kelas agar margin web tidak masuk ke PDF
+        wrapper.classList.add('pdf-generating');
+
+        // Setup Opsi html2pdf
+        var opt = {
+            margin:       [15, 12, 15, 12], // Margin atas, kanan, bawah, kiri (mm)
+            filename:     'Laporan-Forensik_' + rid + '.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                allowTaint: false,
+                scrollY: 0,
+                windowWidth: printArea.scrollWidth 
+            },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            // DITAMBAHKAN KONFIGURASI AVOID PAGEBREAK DI SINI
+            pagebreak:    { 
+                mode: ['css', 'legacy'],
+                avoid: ['tr', '.avoid-break', '.section-title', '.verdict-box']
+            }
+        };
+
+        // Eksekusi pembuatan PDF hanya pada printArea (bukan keseluruhan body/page)
+        html2pdf().set(opt).from(printArea).save().then(function() {
+            // Kembalikan styling normal ke website
+            wrapper.classList.remove('pdf-generating');
+            
+            btn.textContent = '\u2713 PDF Berhasil Diunduh!';
+            setTimeout(function() {
+                btn.textContent = '\u2B07 Unduh Laporan PDF';
+                btn.classList.remove('generating');
+                btn.disabled = false;
+            }, 2500);
+        }).catch(function(err) {
+            wrapper.classList.remove('pdf-generating');
+            console.error('PDF generation error:', err);
+            btn.textContent = 'Gagal. Coba lagi.';
+            btn.classList.remove('generating');
+            btn.disabled = false;
+        });
+    }
+</script>
+</body>
+</html>

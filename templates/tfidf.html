@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <title>Visualisasi & Kalkulasi TF-IDF Cosine Similarity</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        :root {
+            --neon-blue: #38bdf8;
+            --neon-yellow: #facc15;
+            --neon-green: #4ade80;
+            --neon-red: #fb7185;
+            --bg-main: #0f172a;
+            --bg-input: #1e293b;
+            --border-color: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body { font-family: 'Inter', 'Segoe UI', sans-serif; color: var(--text-main); background: var(--bg-main); line-height: 1.6; }
+        
+        .tfidf-hero { text-align: center; padding: 30px 15px; margin-bottom: 30px; background: linear-gradient(180deg, rgba(56, 189, 248, 0.1) 0%, transparent 100%); border-bottom: 1px solid var(--border-color); border-radius: 0 0 20px 20px; }
+        .tfidf-hero h1 { margin: 0 0 10px; font-size: 2em; letter-spacing: -0.5px; }
+        
+        .card { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 25px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .card-header { display: flex; align-items: center; padding: 15px 20px; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s; user-select: none; }
+        .card-header:hover { background: rgba(255,255,255,0.04); }
+        .card-header-icon { font-size: 1.2em; margin-right: 12px; }
+        .card-header-title { font-weight: 600; flex-grow: 1; font-size: 1.1em; }
+        .card-body { padding: 20px; display: block; }
+        .card-body.collapsed { display: none; }
+        
+        .math-step-title { font-size: 1.1em; color: var(--neon-blue); margin: 25px 0 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; display: flex; align-items: center; }
+        .math-step-title span { background: var(--neon-blue); color: var(--bg-main); width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.8em; font-weight: bold; margin-right: 10px; }
+        
+        .math-box { background: #020617; border-left: 4px solid var(--neon-yellow); border-radius: 0 8px 8px 0; padding: 15px 20px; margin: 15px 0; font-family: 'Fira Code', 'Consolas', monospace; font-size: 0.9em; overflow-x: auto; }
+        .math-box .label { color: var(--text-muted); font-size: 0.85em; font-family: 'Inter', sans-serif; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block;}
+        
+        .vector-table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 10px; }
+        .vector-table th { background: rgba(0,0,0,0.3); color: var(--text-muted); padding: 12px; text-align: left; font-weight: 500; border-bottom: 2px solid var(--border-color); }
+        .vector-table td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .highlight-row { background: rgba(56, 189, 248, 0.05); }
+        .overlap-text { color: var(--neon-yellow); font-weight: bold; font-size: 0.85em; margin-left: 5px; }
+
+        .feature-tag { display: inline-flex; align-items: center; padding: 4px 12px; margin: 3px; border-radius: 20px; font-size: 0.85em; font-weight: 500; }
+        .feature-tag.query { background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.4); color: var(--neon-blue); }
+        .feature-tag.shared { background: rgba(250, 204, 21, 0.1); border: 1px solid rgba(250, 204, 21, 0.4); color: var(--neon-yellow); }
+
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 25px 0; }
+        .stat-card { background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; text-align: center; }
+        .stat-value { font-size: 2.2em; font-weight: 700; line-height: 1.2; }
+        .stat-label { color: var(--text-muted); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 5px; }
+        
+        .similarity-bar { height: 10px; background: #0f172a; border-radius: 5px; overflow: hidden; margin-top: 8px; border: 1px solid #334155; }
+        .similarity-bar-fill { height: 100%; border-radius: 5px; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: inset 0 0 10px rgba(255,255,255,0.2); }
+        
+        .markdown-content strong { color: var(--neon-blue); }
+        .markdown-content p { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="tfidf-hero">
+            <h1>Bagaimana Mesin Membaca Email Anda?</h1>
+            <p class="subtitle" style="color: var(--text-muted);">Visualisasi Pembedahan Algoritma TF-IDF & Cosine Similarity</p>
+        </div>
+
+        {% if not has_data %}
+        <div class="card" style="text-align: center; padding: 50px 20px;">
+            <div style="font-size: 3em; margin-bottom: 15px;">🔍</div>
+            <h2>Belum Ada Data Analisis</h2>
+            <p style="color: var(--text-muted); max-width: 400px; margin: 0 auto 25px;">Sistem membutuhkan sampel email untuk mengubah teks menjadi perhitungan vektor matematika.</p>
+            <a href="/" class="btn" style="display: inline-block; padding: 10px 30px; background: var(--neon-blue); color: #000; border-radius: 8px; text-decoration: none; font-weight: bold;">Mulai Analisis Email</a>
+        </div>
+
+        {% elif tfidf_data.error is defined %}
+        <div class="card" style="text-align: center; padding: 50px 20px; border-color: var(--neon-red);">
+            <div style="font-size: 3em; margin-bottom: 15px;">⚠️</div>
+            <h2 style="color: var(--neon-red);">Gagal Menghitung Vektor</h2>
+            <p style="color: var(--text-muted);">{{ tfidf_data.error }}</p>
+            <a href="/" class="btn" style="display: inline-block; padding: 10px 30px; margin-top: 20px; background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 8px; text-decoration: none;">Kembali</a>
+        </div>
+
+        {% else %}
+        
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-value" style="color: var(--neon-blue);">{{ tfidf_data.kb_total_patterns }}</div>
+                <div class="stat-label">Pola Knowledge Base</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" style="color: var(--neon-blue);">{{ tfidf_data.total_vocabulary_size }}</div>
+                <div class="stat-label">Dimensi Kamus (N-Gram)</div>
+            </div>
+            <div class="stat-card" style="border-color: {% if tfidf_data.max_similarity_pct > 30 %}var(--neon-red){% elif tfidf_data.max_similarity_pct > 15 %}var(--neon-yellow){% else %}var(--neon-green){% endif %}; position: relative; overflow: hidden;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: {% if tfidf_data.max_similarity_pct > 30 %}var(--neon-red){% elif tfidf_data.max_similarity_pct > 15 %}var(--neon-yellow){% else %}var(--neon-green){% endif %};"></div>
+                <div class="stat-value" style="color: {% if tfidf_data.max_similarity_pct > 30 %}var(--neon-red){% elif tfidf_data.max_similarity_pct > 15 %}var(--neon-yellow){% else %}var(--neon-green){% endif %};">
+                    {{ tfidf_data.max_similarity_pct }}%
+                </div>
+                <div class="stat-label">Tingkat Kemiripan Tertinggi</div>
+            </div>
+        </div>
+
+        {% if tfidf_data.top_pattern and tfidf_data.detailed_steps %}
+        {% set tp = tfidf_data.top_pattern %}
+        {% set ds = tfidf_data.detailed_steps %}
+        
+        {% set true_query_norm = ds.overlap_terms[0].unnorm_tfidf_query / ds.overlap_terms[0].norm_tfidf_query if ds.overlap_terms|length > 0 and ds.overlap_terms[0].norm_tfidf_query > 0 else 1.0 %}
+        {% set true_kb_norm = ds.overlap_terms[0].unnorm_tfidf_kb / ds.overlap_terms[0].norm_tfidf_kb if ds.overlap_terms|length > 0 and ds.overlap_terms[0].norm_tfidf_kb > 0 else 1.0 %}
+        
+        <div class="card" style="border: 1px solid {% if tp.similarity_pct > 30 %}var(--neon-red){% elif tp.similarity_pct > 15 %}var(--neon-yellow){% else %}var(--neon-blue){% endif %};">
+            <div class="card-header" onclick="toggleCard(this)" style="background: rgba({% if tp.similarity_pct > 30 %}251,113,133{% elif tp.similarity_pct > 15 %}250,204,21{% else %}56,189,248{% endif %}, 0.1);">
+                <span class="card-header-icon">🧮</span>
+                <span class="card-header-title" style="color: {% if tp.similarity_pct > 30 %}var(--neon-red){% elif tp.similarity_pct > 15 %}var(--neon-yellow){% else %}var(--neon-blue){% endif %};">
+                    Buku Teks: Simulasi Perhitungan Matematis ({{ tp.similarity_pct }}%)
+                </span>
+                <span class="card-toggle" style="transition: 0.3s; transform: rotate(180deg);">▼</span>
+            </div>
+            
+            <div class="card-body">
+                <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <p style="margin: 0 0 10px;">Agar perhitungannya transparan, mari kita asumsikan database (KB) berisi <strong>N = {{ ds.total_kb_docs }}</strong> dokumen.</p>
+                    <ul style="margin: 0; padding-left: 20px; color: var(--text-muted); font-size: 0.9em;">
+                        <li><strong>Dokumen A (Email Query):</strong> Cuplikan <em>"{{ ds.query_tokens_sample|join(' ') }}..."</em></li>
+                        <li><strong>Dokumen B (Pola KB {{ tp.id }}):</strong> Cuplikan <em>"{{ ds.kb_tokens_sample|join(' ') }}..."</em></li>
+                    </ul>
+                </div>
+
+                <div class="math-step-title"><span>1</span> Menghitung TF (Term Frequency)</div>
+                <p style="font-size: 0.9em; color: var(--text-muted);">TF adalah jumlah kemunculan Term/Frasa secara fisik di dalam sebuah dokumen.</p>
+                <div style="overflow-x: auto;">
+                    <table class="vector-table">
+                        <tr>
+                            <th>Term / Frasa (Kamus Global)</th>
+                            <th style="text-align: center;">TF Dokumen A (Email)</th>
+                            <th style="text-align: center;">TF Dokumen B (KB)</th>
+                        </tr>
+                        {% for t in ds.overlap_terms %}
+                        <tr class="highlight-row">
+                            <td>
+                                <code class="feature-tag shared">{{ t.term }}</code> 
+                                <span class="overlap-text">(overlap)</span>
+                            </td>
+                            <td style="text-align: center; font-weight: bold; color: var(--neon-blue);">
+                                {{ t.tf_query }}x
+                            </td>
+                            <td style="text-align: center; font-weight: bold; color: var(--neon-yellow);">{{ t.tf_kb }}x</td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+
+                <div class="math-step-title"><span>2</span> Menghitung IDF (Inverse Document Frequency)</div>
+                <p style="font-size: 0.9em; color: var(--text-muted);">IDF menilai seberapa langka/penting sebuah Term. Term yang muncul di banyak dokumen akan mendapat nilai kecil, Term langka mendapat nilai besar.</p>
+                <div class="math-box" style="border-left-color: var(--neon-blue);">
+                    <span class="label">Rumus Dasar IDF</span>
+                    IDF(t) = ln( (1 + N) / (1 + DF(t)) ) + 1
+                    <br><br>
+                    <strong>Substitusi untuk term yang overlap:</strong><br>
+                    {% for t in ds.overlap_terms %}
+                    • <code>{{ t.term }}</code> (muncul di {{ t.df }} dokumen): <br>
+                    &nbsp;&nbsp;IDF = ln( (1 + {{ ds.total_kb_docs }}) / (1 + {{ t.df }}) ) + 1 = <strong style="color: var(--neon-blue);">{{ t.idf }}</strong><br>
+                    {% endfor %}
+                </div>
+
+                <div class="math-step-title"><span>3</span> Menghitung Bobot TF-IDF Dasar (Vektor Mentah)</div>
+                <p style="font-size: 0.9em; color: var(--text-muted);">Kalikan nilai TF (Langkah 1) dengan nilai IDF (Langkah 2) untuk membentuk Vektor A dan Vektor B mentah sebelum normalisasi.</p>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+                    <div class="math-box" style="margin: 0; border-left-color: var(--neon-blue);">
+                        <span class="label">Vektor A Mentah (Email)</span>
+                        {% for t in ds.overlap_terms %}
+                        <code>{{ t.term }}</code>: <br>TF ({{ t.tf_query }}) &times; IDF ({{ t.idf }}) = <strong style="color: var(--neon-blue);">{{ "%.4f"|format(t.unnorm_tfidf_query) }}</strong><br><br>
+                        {% endfor %}
+                        [Term Lainnya]: ...
+                    </div>
+                    <div class="math-box" style="margin: 0; border-left-color: var(--neon-yellow);">
+                        <span class="label">Vektor B Mentah (KB {{ tp.id }})</span>
+                        {% for t in ds.overlap_terms %}
+                        <code>{{ t.term }}</code>: <br>TF ({{ t.tf_kb }}) &times; IDF ({{ t.idf }}) = <strong style="color: var(--neon-yellow);">{{ "%.4f"|format(t.unnorm_tfidf_kb) }}</strong><br><br>
+                        {% endfor %}
+                        [Term Lainnya]: ...
+                    </div>
+                </div>
+
+                <div class="math-step-title"><span>4</span> L2-Normalization (Standarisasi Panjang Vektor)</div>
+                <p style="font-size: 0.9em; color: var(--text-muted);">Sebelum menghitung Cosine Similarity, <code>scikit-learn</code> melakukan normalisasi agar email tidak bias pada panjang teks. Setiap nilai mentah (dari Langkah 3) akan dibagi dengan <strong>Panjang Vektor (Norm)</strong>.</p>
+                
+                <div class="math-box" style="border-left-color: var(--neon-red);">
+                    <span class="label">A. Menghitung Panjang Vektor (Norm)</span>
+                    Rumus panjang vektor:<br>
+                    ||V|| = &radic;( x₁&sup2; + x₂&sup2; + x₃&sup2; + ... )
+                    <br><br>
+                    <strong>Dokumen A (Email Query):</strong><br>
+                    ||A|| = &radic;( {% for t in ds.overlap_terms[:3] %}{{ "%.4f"|format(t.unnorm_tfidf_query) }}&sup2; + {% endfor %}... )<br>
+                    ||A|| &asymp; <strong style="color: var(--neon-blue);">{{ "%.4f"|format(true_query_norm) }}</strong>
+                    <br><br>
+                    <strong>Dokumen B (Pola KB {{ tp.id }}):</strong><br>
+                    ||B|| = &radic;( {% for t in ds.overlap_terms[:3] %}{{ "%.4f"|format(t.unnorm_tfidf_kb) }}&sup2; + {% endfor %}... )<br>
+                    ||B|| &asymp; <strong style="color: var(--neon-yellow);">{{ "%.4f"|format(true_kb_norm) }}</strong>
+                </div>
+
+                <div class="math-box" style="border-left-color: var(--neon-red);">
+                    <span class="label">B. Membagi Nilai per-Term (X_norm = X / ||V||)</span>
+                    Dari mana nilai normalisasinya berasal? Kita bagikan nilai mentah TF-IDF dengan Norm yang didapat di atas.<br><br>
+                    
+                    {% for t in ds.overlap_terms %}
+                    <div style="margin-bottom: 15px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 5px;">
+                        <code style="color: white; font-size: 1.1em;">{{ t.term }}</code><br>
+                        • <strong>Dokumen A:</strong> {{ "%.4f"|format(t.unnorm_tfidf_query) }} / {{ "%.4f"|format(true_query_norm) }} &asymp; <strong style="color: var(--neon-blue);">{{ "%.4f"|format(t.norm_tfidf_query) }}</strong><br>
+                        • <strong>Dokumen B:</strong> {{ "%.4f"|format(t.unnorm_tfidf_kb) }} / {{ "%.4f"|format(true_kb_norm) }} &asymp; <strong style="color: var(--neon-yellow);">{{ "%.4f"|format(t.norm_tfidf_kb) }}</strong>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="math-step-title"><span>5</span> Menghitung Cosine Similarity (Dot Product)</div>
+                <p style="font-size: 0.9em; color: var(--text-muted);">Karena vektor sudah dinormalisasi di Langkah 4 (sehingga penyebut rumusnya adalah 1), kita hanya perlu menghitung bagian pembilangnya: <strong>Perkalian Dimensi Sejajar (Dot Product)</strong> menggunakan nilai vektor yang sudah ternormalisasi.</p>
+                
+                <div class="math-box" style="border-left-color: var(--neon-green); text-align: center;">
+                    <span style="font-size: 1.2em;">Cosine Similarity = &Sigma; ( VektorA_Norm &times; VektorB_Norm )</span>
+                </div>
+
+                <div class="math-box">
+                    <span class="label">A. Menghitung Dot Product (Khusus Term Overlap)</span>
+                    Term yang tidak ada di salah satu dokumen akan dikalikan dengan nol (0) dan hangus.<br><br>
+                    {% for t in ds.overlap_terms %}
+                    <code>{{ t.term }}</code>: {{ "%.4f"|format(t.norm_tfidf_query) }} &times; {{ "%.4f"|format(t.norm_tfidf_kb) }} = <strong style="color: var(--neon-yellow);">{{ "%.6f"|format(t.product) }}</strong> (Overlap)<br>
+                    {% endfor %}
+                    [Term non-overlap]: Nilai_A &times; 0 = 0<br>
+                    <br>
+                    Total Dot Product (A &middot; B) = <strong style="color: var(--neon-green); font-size: 1.1em;">{{ "%.6f"|format(ds.dot_product) }}</strong>
+                </div>
+
+                <div class="math-box" style="border-left-color: var(--neon-green); text-align: center; font-size: 1.2em;">
+                    <span class="label">B. Hasil Akhir (Skor Kesamaan)</span>
+                    Cosine Similarity = {{ "%.6f"|format(ds.dot_product) }} / ( 1.0000 &times; 1.0000 )<br><br>
+                    Cosine Similarity &asymp; <strong style="color: var(--neon-green); font-size: 1.5em;">{{ "%.4f"|format(ds.cosine_similarity) }}</strong>
+                </div>
+
+                <div style="background: rgba(74, 222, 128, 0.1); border: 1px solid rgba(74, 222, 128, 0.3); padding: 15px; border-radius: 8px; margin-top: 20px; text-align: center;">
+                    <strong>Kesimpulan Statistik Murni:</strong> Berdasarkan perhitungan TF-IDF Cosine, tingkat kemiripan dokumen ini adalah <strong style="color: var(--neon-green); font-size: 1.2em;">{{ ds.cosine_pct }}%</strong>.
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if llm_reasoning %}
+        <div class="card" style="border: 1px solid var(--neon-blue); box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+            <div class="card-header" onclick="toggleCard(this)" style="background: rgba(56, 189, 248, 0.1);">
+                <span class="card-header-icon">🤖</span>
+                <span class="card-header-title" style="color: var(--neon-blue);">
+                    Analisis Ahli Forensik (AI Semantic Reasoning)
+                </span>
+                <span class="card-toggle" style="transition: 0.3s; transform: rotate(180deg);">▼</span>
+            </div>
+            <div class="card-body">
+                <div class="markdown-content" style="font-size: 1em; line-height: 1.6; color: var(--text-main); white-space: pre-line;">
+                    {{ llm_reasoning | safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <div class="card-header" onclick="toggleCard(this)">
+                <span class="card-header-icon">📊</span>
+                <span class="card-header-title">Ranking Kemiripan Terhadap Semua Pola Database</span>
+                <span class="card-toggle" style="transition: 0.3s; transform: rotate(0deg);">▼</span>
+            </div>
+            <div class="card-body collapsed">
+                <p style="font-size: 0.9em; color: var(--text-muted);">Algoritma di atas dilakukan berulang kali kepada seluruh {{ tfidf_data.kb_total_patterns }} data di Knowledge Base. Kategori final diambil dari peringkat nomor 1.</p>
+                
+                <div style="overflow-x: auto;">
+                    <table class="vector-table">
+                        <tr>
+                            <th style="width: 5%;">#</th>
+                            <th style="width: 15%;">ID Pola</th>
+                            <th style="width: 20%;">Kategori Taktik</th>
+                            <th style="width: 15%;">Skor TF-IDF</th>
+                            <th style="width: 45%;">Skala Kemiripan</th>
+                        </tr>
+                        {% for p in tfidf_data.all_patterns[:20] %} 
+                        <tr style="{% if loop.index == 1 %}background: rgba(255,255,255,0.05);{% endif %}">
+                            <td>{{ loop.index }}</td>
+                            <td><strong style="color: {% if loop.index == 1 %}var(--neon-yellow){% else %}inherit{% endif %}">{{ p.id }}</strong></td>
+                            <td>{{ p.category }}</td>
+                            <td style="font-weight: bold; color: {% if p.similarity_pct > 30 %}var(--neon-red){% elif p.similarity_pct > 15 %}var(--neon-yellow){% elif p.similarity_pct > 1 %}var(--neon-blue){% else %}var(--text-muted){% endif %};">
+                                {{ p.similarity_pct }}%
+                            </td>
+                            <td>
+                                <div class="similarity-bar">
+                                    <div class="similarity-bar-fill" style="width: {{ (p.similarity_pct / 100 * 100)|round|int }}%; background: {% if p.similarity_pct > 30 %}var(--neon-red){% elif p.similarity_pct > 15 %}var(--neon-yellow){% else %}var(--neon-blue){% endif %};"></div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: center; margin-bottom: 50px;">
+            <a href="javascript:history.back()" class="btn" style="padding: 10px 30px; background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 8px; text-decoration: none;">Kembali ke Hasil</a>
+        </div>
+        
+        {% endif %}
+    </div>
+
+    <script>
+        function toggleCard(header) {
+            const body = header.nextElementSibling;
+            const toggleIcon = header.querySelector('.card-toggle');
+            
+            body.classList.toggle('collapsed');
+            
+            if (body.classList.contains('collapsed')) {
+                toggleIcon.style.transform = "rotate(0deg)";
+            } else {
+                toggleIcon.style.transform = "rotate(180deg)";
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            setTimeout(() => {
+                const bars = document.querySelectorAll('.similarity-bar-fill');
+                bars.forEach(bar => {
+                    const targetWidth = bar.style.width;
+                    bar.style.width = '0%';
+                    void bar.offsetWidth;
+                    setTimeout(() => {
+                        bar.style.width = targetWidth;
+                    }, 100);
+                });
+            }, 300);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Phishing Analyzer</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="loader-overlay" id="loader">
+        <div class="spinner"></div>
+        <div class="scanning-text">Generate Analisis...</div>
+    </div>
+
+    <div class="main-wrapper">
+        
+        <div class="form-container">
+            <h1>Email Phishing Analyzer</h1>
+            <p class="subtitle"><em>Sistem Deteksi Email Phishing</em></p>
+
+           <form action="/analyze" method="post" enctype="multipart/form-data" id="analyzeForm">
+                <div class="info-box">
+                    <strong>Pilih Metode Input:</strong> <br>
+                    Unggah file (.eml / .pdf) atau paste teks/header email pada form di bawah. Lihat panduan di sebelah kanan.
+                </div>
+
+                <input type="file" name="email_file" accept=".eml,.pdf" class="file-input">
+
+                <textarea name="email_text" rows="10" placeholder="Atau paste teks pesan di sini..." maxlength="500000"></textarea>
+
+                <button type="submit" class="btn" id="submitBtn">Jalankan Analisis</button>
+            </form>
+        </div>
+
+        <div class="instruction-card">
+            <h2>Panduan Penggunaan</h2>
+            
+            <div class="instruction-tabs">
+                <button type="button" class="tab-btn active" onclick="openInstructionTab(event, 'opsi1')">Opsi 1 (.eml)</button>
+                <button type="button" class="tab-btn" onclick="openInstructionTab(event, 'opsi2')">Opsi 2 (.pdf)</button>
+                <button type="button" class="tab-btn" onclick="openInstructionTab(event, 'opsi3')">Opsi 3 (Raw)</button>
+                <button type="button" class="tab-btn" onclick="openInstructionTab(event, 'opsi4')">Opsi 4 (Manual)</button>
+            </div>
+
+            <div id="opsi1" class="instruction-content active">
+                <h3>Cara Mendapatkan File .eml</h3>
+                <ol>
+                    <li>Buka email yang ingin dianalisis melalui browser.</li>
+                    <li>Klik ikon <strong>titik tiga vertikal</strong> (Lainnya) di pojok kanan atas email tersebut.</li>
+                    <li>Pilih menu <strong>"Download message"</strong> (Unduh pesan).</li>
+                    <li>File dengan ekstensi <code>.eml</code> akan terunduh otomatis ke komputer.</li>
+                    <li>Klik tombol <strong>Choose File</strong> di aplikasi ini dan pilih file tersebut.</li>
+                </ol>
+            </div>
+
+            <div id="opsi2" class="instruction-content">
+                <h3>Cara Menyimpan PDF dari HP</h3>
+                <ol>
+                    <li>Buka aplikasi email (seperti Gmail) di Handphone Anda.</li>
+                    <li>Buka pesan emailnya, lalu ketuk ikon <strong>titik tiga</strong>.</li>
+                    <li>Pilih opsi <strong>"Print"</strong> atau Cetak.</li>
+                    <li>Pada pilihan printer di bagian atas, ubah menjadi <strong>"Save as PDF"</strong>.</li>
+                    <li>Simpan file tersebut ke memori internal HP Anda.</li>
+                    <li>Unggah file <code>.pdf</code> tersebut melalui form di aplikasi ini.</li>
+                </ol>
+            </div>
+
+            <div id="opsi3" class="instruction-content">
+                <h3>Cara Mendapatkan Raw Teks Email</h3>
+                <ol>
+                    <li>Buka pesan email melalui browser.</li>
+                    <li>Klik ikon <strong>titik tiga vertikal</strong> di sebelah tombol balas.</li>
+                    <li>Pilih opsi <strong>"Show original"</strong> (Tampilkan pesan asli).</li>
+                    <li>Browser akan membuka tab baru berisi baris kode. Klik tombol <strong>"Copy to clipboard"</strong>.</li>
+                    <li>Kembali ke aplikasi ini, lalu <strong>Paste (Ctrl+V)</strong> teks tersebut ke dalam kotak teks yang tersedia.</li>
+                </ol>
+            </div>
+
+            <div id="opsi4" class="instruction-content">
+                <h3>Cara Copy-Paste Pesan & Header Manual</h3>
+                <ol>
+                    <li>Buka pesan email di perangkat Anda.</li>
+                    <li>Klik tahan dan blok teks mulai dari informasi header pengirim (Dari, Kepada, Tanggal, Subjek).</li>
+                    <li>Tarik terus kursor/blokan Anda hingga mencakup seluruh isi (body) pesan email tersebut.</li>
+                    <li><strong>Copy</strong> teks yang sudah diblok tersebut.</li>
+                    <li><strong>Paste</strong> teks tersebut secara langsung ke dalam kotak teks di aplikasi ini.</li>
+                </ol>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        document.getElementById('analyzeForm').addEventListener('submit', function() {
+            document.getElementById('loader').classList.add('active');
+        });
+
+        function openInstructionTab(evt, tabId) {
+            var contents = document.getElementsByClassName('instruction-content');
+            for (var i = 0; i < contents.length; i++) {
+                contents[i].classList.remove('active');
+            }
+
+            var buttons = document.querySelectorAll('.instruction-tabs .tab-btn');
+            for (var i = 0; i < buttons.length; i++) {
+                buttons[i].classList.remove('active');
+            }
+
+            document.getElementById(tabId).classList.add('active');
+            evt.currentTarget.classList.add('active');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hasil Analisis Email</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        /* CSS Khusus untuk Tab Preview Email */
+        .email-tabs {
+            display: flex;
+            background: var(--bg-input);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 12px 20px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-weight: bold;
+            font-size: 0.9em;
+            transition: 0.2s;
+            border-bottom: 2px solid transparent;
+        }
+        .tab-btn.active {
+            color: var(--neon-blue);
+            border-bottom: 2px solid var(--neon-blue);
+            background: rgba(56, 189, 248, 0.05);
+        }
+        .tab-btn:hover {
+            background: rgba(56, 189, 248, 0.1);
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Laporan Analisis Email Phishing</h1>
+        <p class="subtitle"><em>Email Phishing Analyzer</em></p>
+
+        <div class="awam-section">
+            <h2>Kesimpulan Cepat</h2>
+
+            <div class="status-box {{ risk_details.warna }}">
+                Status: {{ risk_details.status }}<br>
+                <small style="font-size: 16px; font-weight: normal; color: var(--text-main);">Tingkat Risiko: {{ risk_details.score }}/100</small>
+                {% if risk_details.bonus is defined and risk_details.bonus != 0 %}
+                <br><small style="font-size: 13px; font-weight: normal; color: var(--neon-green);">Bonus Legitimasi: {{ risk_details.bonus }}</small>
+                {% endif %}
+            </div>
+
+           <div class="ai-explanation card" style="margin-bottom: 30px;">
+               <div class="card-body" style="border-top: none;">
+                   <h3 style="margin-top: 0;">Saran AI (Kecerdasan Buatan):</h3>
+                   <p style="font-size: 1.1em; line-height: 1.6; color: var(--text-main);"><strong>{{ risk_details.saran }}</strong></p>
+
+                   <h3 style="margin-top: 20px;">Mengapa Email Ini Mendapat Status Tersebut?</h3>
+                   <ul class="rincian-list">
+                       {% if not risk_details.rincian %}
+                           <li>Tidak ditemukan indikator berbahaya yang menonjol dalam email ini.</li>
+                       {% endif %}
+                       {% for alasan in risk_details.rincian %}
+                           <li>{{ alasan }}</li>
+                       {% endfor %}
+                   </ul>
+               </div>
+           </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 30px; border-color: var(--neon-blue);">
+            <div class="card-header" onclick="toggleCard(this)" style="background-color: rgba(56, 189, 248, 0.1); cursor: pointer;">
+                <span class="card-header-icon">&#128202;</span>
+                <span class="card-header-title" style="color: var(--neon-blue);">Rincian Skor & Indikator Pemicu (Flags)</span>
+                <span class="card-toggle" style="transform: rotate(180deg);">&#9662;</span>
+            </div>
+            <div class="card-body">
+                <div style="margin-bottom: 15px; padding: 12px; background: var(--bg-input); border-radius: 6px; font-size: 0.85em; color: var(--text-muted);">
+                    <strong>Formula:</strong> S_total = max(min(S_A + S_B + S_C + S_D + BONUS, 100), 0)<br>
+                    <strong>S_A</strong> = Autentikasi Email &amp; Header |
+                    <strong>S_B</strong> = URL &amp; File |
+                    <strong>S_C</strong> = Konten &amp; Social Engineering |
+                    <strong>S_D</strong> = Reputasi Domain &amp; Redirect
+                </div>
+                {% if risk_details.breakdown %}
+                    {% for key, comp in risk_details.breakdown.items() %}
+                    <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <strong>{{ key }} — {{ comp.label }}</strong>
+                            {% if key == 'BONUS' %}
+                                <span style="color: var(--neon-green); font-weight: bold;">{{ comp.score }}</span>
+                            {% elif key == 'PENALTI' %}
+                                <span style="color: var(--neon-red); font-weight: bold;">+{{ comp.score }}</span>
+                            {% else %}
+                                <span style="color: var(--neon-blue); font-weight: bold;">{{ comp.score }} / {{ comp.max }}</span>
+                            {% endif %}
+                        </div>
+                        {% if comp.flags %}
+                            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            {% for flag in comp.flags %}
+                                {% if flag.weight < 0 %}
+                                <span style="background-color: rgba(74, 222, 128, 0.15); border: 1px solid var(--neon-green); color: var(--neon-green); padding: 4px 10px; border-radius: 20px; font-size: 0.8em; font-weight: bold;">
+                                    {{ flag.label }} <span style="color: var(--text-main);">({{ flag.weight }})</span>
+                                </span>
+                                {% else %}
+                                <span style="background-color: rgba(251, 113, 133, 0.15); border: 1px solid var(--neon-red); color: var(--neon-red); padding: 4px 10px; border-radius: 20px; font-size: 0.8em; font-weight: bold;">
+                                    {{ flag.label }} <span style="color: var(--text-main);">(+{{ flag.weight }})</span>
+                                </span>
+                                {% endif %}
+                            {% endfor %}
+                            </div>
+                        {% else %}
+                            <span style="font-size: 0.85em; color: var(--neon-green);">&#10003; Aman (Tidak ada flag yang terpicu)</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="teknis-section">
+            <h2>Data Analisis Teknis (Detail)</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.9em;">Klik pada masing-masing panel di bawah ini untuk melihat detail teknis.</p>
+
+           <div class="card">
+                <div class="card-header" onclick="toggleCard(this)">
+                    <span class="card-header-icon">&#127917;</span>
+                    <span class="card-header-title">1. [S_A] Analisis Identitas Pengirim (Email Spoofing)</span>
+                    <span class="card-toggle">&#9662;</span>
+                </div>
+                <div class="card-body collapsed">
+                    <p class="help-text">Mengecek apakah pengirim email benar-benar dari instansi resmi atau penipu yang memalsukan nama.</p>
+                    <div class="table-responsive">
+                        <table>
+                            <tr><th>Parameter</th><th>Data</th><th>Status & Penjelasan</th></tr>
+                            
+                            <tr>
+                                <td style="width: 25%;">Klaim Pengirim (From)</td>
+                                <td>{{ spoof_analysis.from_header }}</td>
+                                <td>-</td>
+                            </tr>
+                            
+                            <tr>
+                                <td>Subjek & Status Pesan</td>
+                                <td colspan="2">
+                                    <div class="break-text" style="margin-bottom: 8px;">
+                                        <strong>Subjek:</strong> {{ spoof_analysis.subject_header | default('Tidak Ada Subjek') }}
+                                    </div>
+                                    
+                                    {% if spoof_analysis.is_forwarded %}
+                                        <div style="background-color: rgba(250, 204, 21, 0.1); border-left: 4px solid var(--neon-yellow); padding: 10px; border-radius: 4px;">
+                                            <span style="color: var(--neon-yellow); font-weight: bold; font-size: 1.1em;">&#9888; PERHATIAN: EMAIL TERUSAN (FORWARDED)</span>
+                                            <p style="margin: 5px 0 0 0; font-size: 0.85em; color: var(--text-main);">
+                                                Sistem mendeteksi ini adalah email yang diteruskan dari akun lain. <br>
+                                                <strong>Pengirim Asli:</strong> <code style="color: var(--neon-red); font-size: 1.1em;">{{ spoof_analysis.original_sender | default('Tidak ditemukan di teks') }}</code>
+                                            </p>
+                                            
+                                            {% if spoof_analysis.forward_indicators %}
+                                            <div style="margin-top: 8px; padding: 6px 10px; background: rgba(0,0,0,0.15); border-radius: 4px;">
+                                                <span style="font-size: 0.75em; color: var(--neon-yellow); text-transform: uppercase; font-weight: bold;">Log Ekstraksi Forensik:</span>
+                                                <ul style="margin: 4px 0 0 15px; padding: 0; font-size: 0.8em; color: var(--text-muted); font-family: monospace;">
+                                                    {% for indicator in spoof_analysis.forward_indicators %}
+                                                        <li>{{ indicator }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                            {% endif %}
+
+                                            <p style="margin: 8px 0 0 0; font-size: 0.8em; color: var(--text-muted); line-height: 1.4;">
+                                                *Catatan Forensik: Status <strong>SPF/DKIM/DMARC</strong> di bawah ini adalah milik akun penerus, <strong>BUKAN</strong> milik pengirim asli. Autentikasi di bawah ini tidak dapat digunakan untuk menjamin keamanan konten email asli!
+                                            </p>
+                                        </div>
+                                    {% else %}
+                                        <span style="background-color: rgba(74, 222, 128, 0.15); border: 1px solid var(--neon-green); color: var(--neon-green); padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold;">
+                                            &#10003; EMAIL LANGSUNG
+                                        </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>Jalur Balasan (Return-Path)</td>
+                                <td>{{ spoof_analysis.return_path }}</td>
+                                <td>-</td>
+                            </tr>
+                            <tr>
+                                <td>Kesamaan Domain</td>
+                                <td>From: <strong>{{ spoof_analysis.from_domain }}</strong><br>Asli: <strong>{{ spoof_analysis.return_domain }}</strong></td>
+                                <td>
+                                    {% if spoof_analysis.domain_mismatch %}
+                                        <span class="text-danger">TIDAK COCOK</span>
+                                    {% else %}
+                                        <span class="text-success">COCOK</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% if spoof_analysis.reply_to %}
+                            <tr>
+                                <td>Reply-To</td>
+                                <td>{{ spoof_analysis.reply_to }}</td>
+                                <td>
+                                    {% if spoof_analysis.reply_to_mismatch %}
+                                        <span class="text-danger">TIDAK COCOK dengan From</span>
+                                    {% else %}
+                                        <span class="text-success">COCOK</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <td>SPF (Sender Policy Framework)</td>
+                                <td>{{ spoof_analysis.spf_status | upper }}</td>
+                                <td>
+                                    {% if spoof_analysis.spf_status == 'pass' %}<span class="text-success" style="font-weight:bold;">&#10003; PASS</span>
+                                    {% elif spoof_analysis.spf_status == 'missing' %}<span class="text-warning" style="font-weight:bold;">TIDAK ADA</span>
+                                    {% else %}<span class="text-danger" style="font-weight:bold;">GAGAL ({{ spoof_analysis.spf_status }})</span>{% endif %}
+                                    <div style="font-size: 0.8em; color: var(--text-muted); margin-top: 5px;">{{ spoof_analysis.spf_explanation }}</div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>DKIM (DomainKeys)</td>
+                                <td>{{ spoof_analysis.dkim_status | upper }}</td>
+                                <td>
+                                    {% if spoof_analysis.dkim_status == 'pass' %}<span class="text-success" style="font-weight:bold;">&#10003; PASS</span>
+                                    {% elif spoof_analysis.dkim_status == 'missing' %}<span class="text-warning" style="font-weight:bold;">TIDAK ADA</span>
+                                    {% else %}<span class="text-danger" style="font-weight:bold;">GAGAL ({{ spoof_analysis.dkim_status }})</span>{% endif %}
+                                    <div style="font-size: 0.8em; color: var(--text-muted); margin-top: 5px;">{{ spoof_analysis.dkim_explanation }}</div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>DMARC (Reporting & Conformance)</td>
+                                <td>{{ spoof_analysis.dmarc_status | upper }}</td>
+                                <td>
+                                    {% if spoof_analysis.dmarc_status == 'pass' %}<span class="text-success" style="font-weight:bold;">&#10003; PASS</span>
+                                    {% elif spoof_analysis.dmarc_status == 'missing' %}<span class="text-warning" style="font-weight:bold;">TIDAK ADA</span>
+                                    {% else %}<span class="text-danger" style="font-weight:bold;">GAGAL ({{ spoof_analysis.dmarc_status }})</span>{% endif %}
+                                    <div style="font-size: 0.8em; color: var(--text-muted); margin-top: 5px;">{{ spoof_analysis.dmarc_explanation }}</div>
+                                </td>
+                            </tr>
+                            
+                            <tr>
+                                <td>Log Autentikasi Asli<br><small style="color:var(--text-muted);">(Raw Auth Header)</small></td>
+                                <td colspan="2">
+                                    <div style="margin-bottom: 8px; font-size: 0.9em;">
+                                        Kesimpulan Log: 
+                                        <span class="{{ spoof_analysis.auth_class }}" style="font-weight: bold; padding: 3px 8px; border-radius: 4px; background: rgba(0,0,0,0.05); border: 1px solid currentColor;">
+                                            {{ spoof_analysis.auth_summary }}
+                                        </span>
+                                    </div>
+                                    <div class="break-text" style="font-family: monospace; font-size: 0.8em; background: rgba(56, 189, 248, 0.05); padding: 10px; border-radius: 6px; color: var(--text-main); border-left: 3px solid var(--neon-blue); line-height: 1.4;">
+                                        {{ spoof_analysis.auth_results | default('-') }}
+                                    </div>
+                                    <div style="font-size: 0.8em; color: var(--text-muted); margin-top: 6px;">
+                                        *Penjelasan: Ini adalah "Struk Bukti Digital" asli dari server penerima (seperti Google/Yahoo). Kesimpulan di atas disimpulkan berdasarkan isi struk ini.
+                                    </div>
+                                </td>
+                            </tr>
+
+                            {% if spoof_analysis.x_mailer %}
+                            <tr>
+                                <td>X-Mailer</td>
+                                <td>{{ spoof_analysis.x_mailer }}</td>
+                                <td>
+                                    {% if spoof_analysis.suspicious_mailer %}
+                                        <span class="text-danger">MENCURIGAKAN</span>
+                                    {% else %}
+                                        <span class="text-success">Normal</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            
+                            <tr>
+                                <td>Jejak Jalur Pengiriman<br><small style="color:var(--text-muted);">(Received Hops)</small></td>
+                                <td colspan="2">
+                                    <div style="margin-bottom: 8px;"><strong>Total Rute:</strong> {{ spoof_analysis.received_hop_count }} server perantara terdeteksi.</div>
+                                    
+                                    {% if spoof_analysis.received_hop_count > 0 %}
+                                        <div style="margin-top: 8px; border-left: 3px solid {% if spoof_analysis.has_suspicious_hops %}var(--neon-yellow){% else %}var(--neon-green){% endif %}; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 4px;">
+                                            <table style="width: 100%; border: none; margin: 0; font-size: 0.85em; background: transparent;">
+                                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                                    <th style="padding: 4px; text-align: left; width: 10%;">Hop #</th>
+                                                    <th style="padding: 4px; text-align: left; width: 40%;">Nama Server</th>
+                                                    <th style="padding: 4px; text-align: left; width: 50%;">Status & Keterangan</th>
+                                                </tr>
+                                                {% for hop in spoof_analysis.received_chain %}
+                                                <tr style="border-bottom: 1px dashed rgba(255,255,255,0.05);">
+                                                    <td style="padding: 6px 4px;">{{ hop.index }}</td>
+                                                    <td style="padding: 6px 4px;" class="break-text">
+                                                        <code style="color: {% if hop.suspicious %}var(--neon-yellow){% else %}var(--neon-blue){% endif %};">
+                                                            {{ hop.from_server | default('Tidak Diketahui', true) }}
+                                                        </code>
+                                                    </td>
+                                                    <td style="padding: 6px 4px;">
+                                                        {% if hop.suspicious %}
+                                                            <span class="text-warning" style="font-weight:bold;">&#9888; ANOMALI / GAGAL STANDAR</span><br>
+                                                            <span style="color: var(--text-muted); font-size: 0.9em;">{{ hop.reason }}</span>
+                                                        {% else %}
+                                                            <span class="text-success" style="font-weight:bold;">&#10003; BERHASIL / NORMAL</span><br>
+                                                            <span style="color: var(--text-muted); font-size: 0.9em;">Rute server publik yang sah.</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </table>
+                                        </div>
+                                        {% if spoof_analysis.has_suspicious_hops %}
+                                        <div style="margin-top: 8px; font-size: 0.8em; color: var(--text-muted);">
+                                            *Catatan: Jika DMARC/SPF di atas berstatus <strong class="text-success">PASS</strong>, anomali rute ini biasanya hanyalah server jaringan internal milik perusahaan (Aman/Normal). Namun jika berstatus GAGAL, ini adalah tanda kuat penyembunyian identitas (Spoofing).
+                                        </div>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-warning" style="font-weight:bold;">Tidak ada jejak pengiriman.</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header" onclick="toggleCard(this)">
+                    <span class="card-header-icon">&#128279;</span>
+                    <span class="card-header-title">2. [S_B] Analisis Struktur Tautan (URL) &mdash; Detail</span>
+                    <span class="card-toggle">&#9662;</span>
+                </div>
+                <div class="card-body collapsed">
+                    <p class="help-text">Membongkar tautan tersembunyi: encoding, punycode, Cyrillic/homograph, shortlink secara detail.</p>
+
+                    {% if url_analysis %}
+                    {% for link in url_analysis %}
+
+                    {% if link.risk_level == 'TINGGI' %}
+                        {% set border_color = 'var(--neon-red)' %}
+                        {% set badge_bg    = 'rgba(251,113,133,0.2)' %}
+                        {% set badge_color = 'var(--neon-red)' %}
+                    {% elif link.risk_level == 'SEDANG' %}
+                        {% set border_color = 'var(--neon-yellow)' %}
+                        {% set badge_bg    = 'rgba(250,204,21,0.2)' %}
+                        {% set badge_color = 'var(--neon-yellow)' %}
+                    {% else %}
+                        {% set border_color = 'var(--neon-green)' %}
+                        {% set badge_bg    = 'rgba(74,222,128,0.2)' %}
+                        {% set badge_color = 'var(--neon-green)' %}
+                    {% endif %}
+
+                    <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 6px; border-left: 3px solid {{ border_color }};">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <strong style="color: var(--neon-blue);">URL #{{ loop.index }}</strong>
+                            <span style="padding: 2px 10px; border-radius: 12px; font-size: 0.8em; font-weight: bold; background: {{ badge_bg }}; color: {{ badge_color }}; border: 1px solid {{ border_color }};">
+                                {{ link.risk_level }}
+                            </span>
+                        </div>
+                        <div class="break-text" style="font-family: monospace; font-size: 0.85em; color: var(--text-main); margin-bottom: 10px; padding: 8px; background: var(--bg-main); border-radius: 4px;">
+                            {{ link.url[:200] }}
+                        </div>
+
+                        <div class="table-responsive">
+                            <table style="min-width: auto; font-size: 0.85em;">
+                                <tr>
+                                    <td style="width: 35%; color: var(--text-muted);">Domain</td>
+                                    <td><strong>{{ link.domain }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <td style="color: var(--text-muted);">URL Encoding</td>
+                                    <td>
+                                        {% if link.encoded %}
+                                            <span class="text-warning">Terdeteksi</span>
+                                            <br><small style="color: var(--text-muted);">Karakter encoding: <code>{{ link.encoded_chars }}</code></small>
+                                            <br><small style="color: var(--text-muted);">URL decoded: <span class="break-text">{{ link.decoded_url[:150] }}</span></small>
+                                        {% else %}
+                                            <span class="text-success">Tidak ada encoding</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="color: var(--text-muted);">Punycode / IDN</td>
+                                    <td>
+                                        {% if link.punycode %}
+                                            <span class="text-danger">TERDETEKSI &mdash; Homograph Attack</span>
+                                            <br><small style="color: var(--text-muted);">Domain asli (punycode): <code>{{ link.domain }}</code></small>
+                                            <br><small style="color: var(--text-muted);">Domain decoded (visual): <code style="color: var(--neon-red);">{{ link.punycode_decoded }}</code></small>
+                                        {% else %}
+                                            <span class="text-success">Tidak terdeteksi</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="color: var(--text-muted);">Cyrillic / Homograph</td>
+                                    <td>
+                                        {% if link.cyrillic %}
+                                            <span class="text-danger">TERDETEKSI &mdash; Karakter Cyrillic</span>
+                                            <br><small style="color: var(--text-muted);">Karakter ditemukan: <code style="font-size: 1.2em; color: var(--neon-red);">{{ link.cyrillic_chars }}</code></small>
+                                        {% else %}
+                                            <span class="text-success">Tidak terdeteksi</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="color: var(--text-muted);">URL Shortener</td>
+                                    <td>
+                                        {% if link.shortlink %}
+                                            <span class="text-warning">TERDETEKSI</span>
+                                            <br><small style="color: var(--text-muted);">Layanan: <code>{{ link.shortener_used }}</code></small>
+                                        {% else %}
+                                            <span class="text-success">Tidak (URL langsung)</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% if link.has_dangerous_file or link.has_macro_file %}
+                                <tr>
+                                    <td style="color: var(--text-muted);">Ekstensi File</td>
+                                    <td>
+                                        {% if link.has_dangerous_file %}
+                                            <span class="text-danger">Resiko File Berbahaya: {{ link.dangerous_extension }}</span>
+                                        {% endif %}
+                                        {% if link.has_macro_file %}
+                                            <span class="text-danger">Resiko File Bermakro: {{ link.macro_extension }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% if link.deceptive_subdomain %}
+                                <tr>
+                                    <td style="color: var(--text-muted);">Subdomain Palsu</td>
+                                    <td>
+                                        <span class="text-danger">Brand "{{ link.impersonated_brand }}" digunakan sebagai subdomain</span>
+                                        <br><small style="color: var(--text-muted);">Domain asli: <code>{{ link.real_domain }}</code></small>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% if link.is_data_uri %}
+                                <tr>
+                                    <td style="color: var(--text-muted);">Data URI</td>
+                                    <td><span class="text-danger">TERDETEKSI &mdash; Konten di-embed langsung dalam URL</span></td>
+                                </tr>
+                                {% endif %}
+                                {% if link.is_javascript_uri %}
+                                <tr>
+                                    <td style="color: var(--text-muted);">JavaScript URI</td>
+                                    <td><span class="text-danger">TERDETEKSI &mdash; Kode JavaScript di-embed dalam URL</span></td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p style="text-align: center; color: var(--text-muted);">Tidak ada tautan ditemukan dalam email.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if attachment_analysis and attachment_analysis.total_count > 0 %}
+            <div class="card">
+                <div class="card-header" onclick="toggleCard(this)">
+                    <span class="card-header-icon">&#128206;</span>
+                    <span class="card-header-title">3. [S_B] Analisis Attachment ({{ attachment_analysis.total_count }} file)</span>
+                    <span class="card-toggle">&#9662;</span>
+                </div>
+                <div class="card-body collapsed">
+                    <p class="help-text">Menganalisis file terlampir untuk mendeteksi malware dan file berbahaya.</p>
+                    <div class="table-responsive">
+                        <table>
+                            <tr><th>Nama File</th><th>Ukuran</th><th>Tipe</th><th>Hash (SHA-256)</th><th>Risiko</th></tr>
+                            {% for att in attachment_analysis.attachments %}
+                            <tr>
+                                <td class="break-text">{{ att.filename }}</td>
+                                <td>{{ att.size_display }}</td>
+                                <td>{{ att.content_type }}</td>
+                                <td style="font-family: monospace; font-size: 0.8em;">{{ att.hash_sha256_short }}</td>
+                                <td>
+                                    {% if att.risk_level == 'TINGGI' %}
+                                        <span class="text-danger">{{ att.risk_level }}</span>
+                                        <br><small>{{ att.risk_reasons|join(', ') }}</small>
+                                    {% elif att.risk_level == 'SEDANG' %}
+                                        <span class="text-warning">{{ att.risk_level }}</span>
+                                        <br><small>{{ att.risk_reasons|join(', ') }}</small>
+                                    {% else %}
+                                        <span class="text-success">{{ att.risk_level }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-header" onclick="toggleCard(this)">
+                    <span class="card-header-icon">&#129488;</span>
+                    <span class="card-header-title">{% if attachment_analysis and attachment_analysis.total_count > 0 %}4{% else %}3{% endif %}. [S_C] Analisis Konten & Social Engineering</span>
+                    <span class="card-toggle">&#9662;</span>
+                </div>
+                <div class="card-body collapsed">
+                    <p class="help-text">Mendeteksi manipulasi psikologis (Natural Language Processing) dan taktik rekayasa sosial dalam teks.</p>
+                    
+                    <div class="table-responsive">
+                        <table style="margin-top: 10px;">
+                            <tr>
+                                <th>Kategori Ancaman (Taktik)</th>
+                                <th>Status</th>
+                                <th>Kata Kunci Pemicu</th>
+                            </tr>
+                            
+                            {% set se_tactics = ['urgency', 'fear', 'authority', 'reward', 'secrecy', 'credential_request', 'pretexting', 'baiting', 'scarcity', 'social_proof', 'curiosity', 'intimidation', 'impersonation', 'emotional_manipulation'] %}
+                            
+                            {% set detected_count = 0 %}
+                            
+                            {% for tactic in se_tactics %}
+                                {% if content_analysis[tactic] and content_analysis[tactic].detected %}
+                                    <tr>
+                                        <td><strong>{{ content_analysis[tactic].label }}</strong>
+                                            <br><small style="color:#888;">{{ content_analysis[tactic].description }}</small>
+                                        </td>
+                                        <td><span class="text-danger" style="font-weight:bold;">Terdeteksi ({{ content_analysis[tactic].count }})</span></td>
+                                        <td>{{ content_analysis[tactic].matches | join(', ') }}</td>
+                                    </tr>
+                                    {% set detected_count = detected_count + 1 %}
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if content_analysis.total_indicators == 0 %}
+                            <tr>
+                                <td colspan="3" style="text-align: center; color: var(--neon-green); font-weight: bold; padding: 20px;">
+                                    &#10003; Tidak Terdeteksi Adanya Taktik Rekayasa Sosial
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            {% if rag_context and (rag_context.similar_patterns or rag_context.se_tactics) %}
+            <div class="card">
+                <div class="card-header" onclick="toggleCard(this)">
+                    <span class="card-header-icon">&#128269;</span>
+                    <span class="card-header-title">{% if attachment_analysis and attachment_analysis.total_count > 0 %}5{% else %}4{% endif %}. [S_C] Analisis Persamaan Pola Email Serupa</span>
+                    <span class="card-toggle">&#9662;</span>
+                </div>
+                <div class="card-body collapsed">
+                    <p class="help-text">Pola email phishing yang mirip dari database intelijen ancaman (RAG). Hasil ini disinkronkan dengan scoring S_C.</p>
+
+                    {% if rag_context.top_match and rag_context.top_match.similarity > 0.001 %}
+                    {% set tm = rag_context.top_match %}
+                    <div style="margin-bottom: 15px; padding: 15px; background: var(--bg-input); border-radius: 8px; border-left: 4px solid {% if tm.similarity_pct > 30 %}var(--neon-red){% elif tm.similarity_pct > 15 %}var(--neon-yellow){% else %}var(--neon-blue){% endif %};">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <strong style="font-size: 1.1em;">TOP MATCH: {{ tm.id }} &mdash; {{ tm.category }}</strong>
+                            <span style="font-size: 1.4em; font-weight: bold; color: {% if tm.similarity_pct > 30 %}var(--neon-red){% elif tm.similarity_pct > 15 %}var(--neon-yellow){% else %}var(--neon-blue){% endif %};">{{ tm.similarity_pct }}%</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table style="min-width: auto; font-size: 0.9em;">
+                                <tr><th>Field</th><th>Value</th></tr>
+                                <tr><td>Kategori</td><td><strong>{{ tm.category }}</strong></td></tr>
+                                <tr><td>Similarity</td><td>{{ tm.similarity_pct }}%</td></tr>
+                                <tr><td>Taktik</td><td><em>{{ tm.tactic }}</em></td></tr>
+                                <tr><td>Deskripsi</td><td>{{ tm.description }}</td></tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 15px; text-align: center;">
+                        <a href="/tfidf" style="display: inline-block; background: rgba(56, 189, 248, 0.1); border: 1px solid var(--neon-blue); color: var(--neon-blue); padding: 10px 25px; border-radius: 6px; text-decoration: none; font-weight: bold; transition: 0.2s;" onmouseover="this.style.background='rgba(56, 189, 248, 0.2)'" onmouseout="this.style.background='rgba(56, 189, 248, 0.1)'">
+                            &#128202; Lihat Detail Perhitungan
+                        </a>
+                    </div>
+                    {% elif rag_context.similar_patterns %}
+                    {% set p = rag_context.similar_patterns[0] %}
+                    <div style="margin-bottom: 15px; padding: 15px; background: var(--bg-input); border-radius: 8px; border-left: 4px solid {% if p.similarity_pct > 30 %}var(--neon-red){% elif p.similarity_pct > 15 %}var(--neon-yellow){% else %}var(--neon-blue){% endif %};">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <strong style="font-size: 1.1em;">TOP MATCH: {{ p.id|default('KB') }} &mdash; {{ p.category }}</strong>
+                            <span style="font-size: 1.4em; font-weight: bold; color: {% if p.similarity_pct > 30 %}var(--neon-red){% elif p.similarity_pct > 15 %}var(--neon-yellow){% else %}var(--neon-blue){% endif %};">{{ p.similarity_pct }}%</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table style="min-width: auto; font-size: 0.9em;">
+                                <tr><th>Field</th><th>Value</th></tr>
+                                <tr><td>Kategori</td><td><strong>{{ p.category }}</strong></td></tr>
+                                <tr><td>Similarity</td><td>{{ p.similarity_pct }}%</td></tr>
+                                <tr><td>Taktik</td><td><em>{{ p.tactic }}</em></td></tr>
+                                <tr><td>Deskripsi</td><td>{{ p.description }}</td></tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 15px; text-align: center;">
+                        <a href="/tfidf" style="display: inline-block; background: rgba(56, 189, 248, 0.1); border: 1px solid var(--neon-blue); color: var(--neon-blue); padding: 10px 25px; border-radius: 6px; text-decoration: none; font-weight: bold; transition: 0.2s;" onmouseover="this.style.background='rgba(56, 189, 248, 0.2)'" onmouseout="this.style.background='rgba(56, 189, 248, 0.1)'">
+                            &#128202; Lihat Detail Perhitungan
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    {% if rag_context.is_whitelisted %}
+                    <div style="margin-top: 15px; padding: 10px; background: rgba(74, 222, 128, 0.1); border: 1px solid var(--neon-green); border-radius: 4px;">
+                        <span class="text-success">&#10003; Domain pengirim termasuk dalam whitelist layanan email resmi.</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-header" onclick="toggleCard(this)">
+                    <span class="card-header-icon">&#127758;</span>
+                    <span class="card-header-title">{% if attachment_analysis and attachment_analysis.total_count > 0 %}6{% else %}5{% endif %}. [S_D] Reputasi Domain</span>
+                    <span class="card-toggle">&#9662;</span>
+                </div>
+                <div class="card-body collapsed">
+                    <p class="help-text">Mengecek umur domain dan reputasi menggunakan OSINT.</p>
+
+                    {% set domains_to_show = all_domain_info if all_domain_info else [domain_info] %}
+
+                    {% for di in domains_to_show %}
+                    {% set is_problematic = (di.virustotal_positives|default(0) > 0) or (di.abuseipdb_score|default(0) > 0) or (di.urlscan_is_malicious|default(false)) or (di.shodan_vulns|default([])|length > 0) %}
+
+                    <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 6px; border-left: 4px solid {% if is_problematic %}var(--neon-red){% else %}var(--neon-green){% endif %};">
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                            <strong style="color: var(--neon-blue); font-size: 1.1em;">Domain: {{ di.domain }}</strong>
+                            {% if is_problematic %}
+                                <span style="background: rgba(251,113,133,0.2); color: var(--neon-red); border: 1px solid var(--neon-red); padding: 2px 10px; border-radius: 12px; font-size: 0.8em; font-weight: bold;">BERMASALAH</span>
+                            {% else %}
+                                <span style="background: rgba(74,222,128,0.2); color: var(--neon-green); border: 1px solid var(--neon-green); padding: 2px 10px; border-radius: 12px; font-size: 0.8em; font-weight: bold;">&#10003; BERSIH</span>
+                            {% endif %}
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; font-size: 0.9em;">
+                            <div><span style="color: var(--text-muted);">IP Address:</span> <strong>{{ di.ip_address | default('-') }}</strong></div>
+                            <div><span style="color: var(--text-muted);">ISP / Lokasi:</span> {{ di.isp | default('-') }} ({{ di.country | default('-') }})</div>
+                            <div><span style="color: var(--text-muted);">Umur Domain:</span>
+                                {% if di.domain_age != '-' %}
+                                    <strong>{{ di.domain_age }} Hari</strong> <small style="color: var(--neon-green);">{{ di.whois_status }}</small>
+                                {% else %}
+                                    <span class="text-warning">Gagal ditarik ({{ di.whois_status }})</span>
+                                {% endif %}
+                            </div>
+                            <div><span style="color: var(--text-muted);">Tgl Dibuat:</span> {{ di.creation_date | default('-') }}</div>
+                        </div>
+
+                        <div style="margin-top: 20px;">
+                            <h3 style="font-size: 1em; color: var(--neon-blue); margin-bottom: 10px;">Hasil Scan</h3>
+                            <div class="table-responsive">
+                                <table>
+                                    <tr><th>Tool</th><th>Hasil</th><th>Detail</th></tr>
+                                    <tr>
+                                        <td style="width: 30%;"><strong>VirusTotal</strong><br><small style="color:var(--text-muted);">Scan URL/Domain</small></td>
+                                        <td>
+                                            {% if di.vt_error %}
+                                                <span class="text-warning">Kendala: {{ di.vt_error }}</span>
+                                            {% elif di.virustotal_checked %}
+                                                {% if di.virustotal_positives > 0 %}
+                                                    <span class="text-danger">TERDETEKSI ({{ di.virustotal_positives }} Engine Positif)</span>
+                                                {% else %}
+                                                    <span class="text-success">Bersih (0 Deteksi)</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span style="color:var(--text-muted);">Menunggu proses...</span>
+                                            {% endif %}
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>AbuseIPDB</strong><br><small style="color:var(--text-muted);">IP Reputation</small></td>
+                                        <td>
+                                            {% if di.abuseipdb_error %}
+                                                <span class="text-warning">Kendala: {{ di.abuseipdb_error }}</span>
+                                            {% elif di.abuseipdb_checked %}
+                                                {% if di.abuseipdb_score > 0 %}
+                                                    <span class="text-danger">BERBAHAYA (Skor: {{ di.abuseipdb_score }}%, {{ di.abuseipdb_reports }} Laporan)</span>
+                                                {% else %}
+                                                    <span class="text-success">Bersih (Skor 0%)</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span style="color:var(--text-muted);">Menunggu proses...</span>
+                                            {% endif %}
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>URLScan.io</strong><br><small style="color:var(--text-muted);">Riwayat Scan</small></td>
+                                        <td>
+                                            {% if di.urlscan_error %}
+                                                <span class="text-warning">Kendala: {{ di.urlscan_error }}</span>
+                                            {% elif di.urlscan_checked %}
+                                                {% if di.urlscan_is_malicious %}
+                                                    <span class="text-danger">MALICIOUS (Ada riwayat scan berbahaya)</span>
+                                                {% else %}
+                                                    <span class="text-success">Belum ada riwayat publik berbahaya</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span style="color:var(--text-muted);">Menunggu proses...</span>
+                                            {% endif %}
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <strong>Shodan InternetDB</strong>
+                                            <br><small style="color:var(--text-muted);">Port &amp; Vuln Scan</small>
+                                        </td>
+                                        <td>
+                                            {% if di.shodan_checked | default(false) %}
+                                                {% if di.shodan_vulns | default([]) | length > 0 %}
+                                                    <span class="text-danger">{{ di.shodan_vulns|length }} kerentanan ditemukan</span>
+                                                {% else %}
+                                                    <span class="text-success">Tidak ada kerentanan</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span style="color:var(--text-muted);">Tidak dicek</span>
+                                            {% endif %}
+                                        </td>
+                                        <td style="font-size:0.85em; color:var(--text-muted);">
+                                            {% if di.shodan_checked | default(false) %}
+                                            Port terbuka: {{ di.shodan_ports | default([]) | join(', ') or 'Tidak ada' }}
+                                            {% if di.shodan_vulns | default([]) %}<br>CVE: {{ di.shodan_vulns[:3] | join(', ') }}{% endif %}
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
+                                <a href="https://urlscan.io/search/#page.domain:{{ di.domain }}" target="_blank" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--neon-blue); padding: 8px 14px; border-radius: 6px; font-size: 0.85em; text-decoration: none; transition: 0.2s;" onmouseover="this.style.background='rgba(56, 189, 248, 0.2)'" onmouseout="this.style.background='rgba(56, 189, 248, 0.1)'">
+                                    URLScan
+                                </a>
+                                <a href="https://www.virustotal.com/gui/domain/{{ di.domain }}" target="_blank" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--neon-blue); padding: 8px 14px; border-radius: 6px; font-size: 0.85em; text-decoration: none; transition: 0.2s;" onmouseover="this.style.background='rgba(56, 189, 248, 0.2)'" onmouseout="this.style.background='rgba(56, 189, 248, 0.1)'">
+                                    VirusTotal
+                                </a>
+                                {% if di.ip_address and di.ip_address != 'Tidak Ditemukan' %}
+                                <a href="https://www.abuseipdb.com/check/{{ di.ip_address }}" target="_blank" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--neon-blue); padding: 8px 14px; border-radius: 6px; font-size: 0.85em; text-decoration: none; transition: 0.2s;" onmouseover="this.style.background='rgba(56, 189, 248, 0.2)'" onmouseout="this.style.background='rgba(56, 189, 248, 0.1)'">
+                                    AbuseIPDB
+                                </a>
+                                <a href="https://www.shodan.io/host/{{ di.ip_address }}" target="_blank" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--neon-blue); padding: 8px 14px; border-radius: 6px; font-size: 0.85em; text-decoration: none; transition: 0.2s;" onmouseover="this.style.background='rgba(56, 189, 248, 0.2)'" onmouseout="this.style.background='rgba(56, 189, 248, 0.1)'">
+                                    Shodan
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    {% if all_domain_info and all_domain_info|length > 1 %}
+                    <div style="margin-top: 15px;">
+                        <p class="help-text"><strong>Domain lain yang dianalisis:</strong></p>
+                        <div class="table-responsive">
+                            <table>
+                                <tr><th>Domain</th><th>IP</th><th>VT</th><th>AbuseIPDB</th><th>URLScan</th></tr>
+                                {% for other_di in all_domain_info %}
+                                {% if other_di.domain != domain_info.domain | default('') %}
+                                <tr>
+                                    <td class="break-text">{{ other_di.domain }}</td>
+                                    <td>{{ other_di.ip_address | default('-') }}</td>
+                                    <td>
+                                        {% if other_di.virustotal_positives | default(0) > 0 %}
+                                            <span class="text-danger">{{ other_di.virustotal_positives }}</span>
+                                        {% else %}
+                                            <span class="text-success">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if other_di.abuseipdb_score | default(0) > 0 %}
+                                            <span class="text-warning">{{ other_di.abuseipdb_score }}%</span>
+                                        {% else %}
+                                            <span class="text-success">0%</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if other_di.urlscan_is_malicious | default(false) %}
+                                            <span class="text-danger">Malicious</span>
+                                        {% elif other_di.urlscan_checked | default(false) %}
+                                            <span class="text-success">Bersih</span>
+                                        {% else %}
+                                            <span style="color:var(--text-muted);">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% endfor %}
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header" onclick="toggleCard(this)">
+                    <span class="card-header-icon">&#128256;</span>
+                    <span class="card-header-title">{% if attachment_analysis and attachment_analysis.total_count > 0 %}7{% else %}6{% endif %}. [S_D] Pelacakan Tujuan Asli Tautan (Redirect Trace)</span>
+                    <span class="card-toggle">&#9662;</span>
+                </div>
+                <div class="card-body collapsed">
+                    <p class="help-text">Melacak apakah tautan otomatis melompat (redirect) ke situs web lain.</p>
+                    {% if redirect_results %}
+                    {% for rr in redirect_results %}
+                    <div style="margin-bottom: 15px;">
+                        <p style="font-size: 0.85em; color: var(--neon-blue); margin-bottom: 5px;">Sumber: <span class="break-text">{{ rr.source_url[:100] }}</span></p>
+                        <div class="table-responsive">
+                            <table style="min-width: auto;">
+                                <tr>
+                                    <th>Langkah</th>
+                                    <th>Menuju URL</th>
+                                    <th>Status &amp; Penjelasan</th>
+                                </tr>
+                                {% for r in rr.chain %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td class="break-text">{{ r.url[:150] }}</td>
+                                    <td>
+                                        <strong style="color: var(--text-main);">{{ r.status }}</strong>
+                                        {% if r.cross_domain %}<br><span class="text-warning" style="font-size:0.8em;">&#8599; Lintas Domain</span>{% endif %}
+                                        
+                                        {% if r.explanation %}
+                                        <div style="margin-top: 6px; font-size: 0.85em; color: var(--text-muted); line-height: 1.3;">
+                                            {{ r.explanation }}
+                                        </div>
+                                        {% endif %}
+                                        
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p style="text-align:center; color: var(--text-muted);">Tidak ada data redirect</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if email_preview %}
+        <div class="card" style="margin-top: 40px; border: 1px solid var(--neon-blue);">
+            <div class="card-header" onclick="toggleCard(this)" style="background-color: rgba(56, 189, 248, 0.1);">
+                <span class="card-header-icon">&#128232;</span>
+                <span class="card-header-title" style="color: var(--neon-blue); font-size: 1.1em;">Lihat Konten Teks Email Asli</span>
+                {% if file_info and file_info.name %}
+                <span class="pill pill-gray" style="margin-left: auto; font-size: 0.8em; padding: 2px 8px; border-radius: 12px; background: var(--bg-main); color: var(--text-main);">{{ file_info.name }}</span>
+                {% endif %}
+                <span class="card-toggle">&#9662;</span>
+            </div>
+            
+            <div class="card-body collapsed" style="padding: 0;">
+                
+                <div class="email-tabs">
+                    <button class="tab-btn active" onclick="switchTab(event, 'html-view')">&#127760; Tampilan Visual (HTML)</button>
+                    <button class="tab-btn" onclick="switchTab(event, 'raw-view')">&#128196; Teks Bersih (Plain Text)</button>
+                </div>
+
+                <div id="html-view" class="tab-content active" style="background: white;">
+                    <iframe 
+                        sandbox="allow-same-origin" 
+                        srcdoc="{{ email_preview.html_content | escape }}" 
+                        style="width: 100%; height: 600px; border: none; display: block; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
+                    </iframe>
+                </div>
+
+                <div id="raw-view" class="tab-content" style="padding: 15px; background: var(--bg-input); max-height: 600px; overflow-y: auto; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
+                    <div class="email-preview" style="font-family: monospace; font-size: 0.9em; line-height: 1.5; color: var(--text-main);">
+                        {{ email_preview.text_content | safe }}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="center-btn no-print" style="margin-top: 30px; display: flex; gap: 10px; justify-content: center;">
+            <a href="/" class="btn" style="background: var(--text-muted); text-decoration: none;">Analisis Baru</a>
+            <a href="/halaman_pdf" target="_blank" class="btn" style="background: var(--neon-blue); text-decoration: none;">Cetak Laporan Forensik</a> 
+        </div>
+    </div>
+
+    <script>
+      function toggleCard(header) {
+        const body = header.nextElementSibling;
+        const toggleIcon = header.querySelector('.card-toggle');
+        body.classList.toggle('collapsed');
+        // Script ditambahkan pembacaan style bawaan ketika pertama kali toggle di klik
+        if (body.classList.contains('collapsed')) {
+            toggleIcon.style.transform = "rotate(0deg)";
+        } else {
+            toggleIcon.style.transform = "rotate(180deg)";
+        }
+      }
+
+      function switchTab(evt, tabName) {
+        evt.stopPropagation();
+        const container = evt.currentTarget.closest('.card-body');
+        
+        const contents = container.querySelectorAll('.tab-content');
+        contents.forEach(c => c.classList.remove('active'));
+
+        const btns = container.querySelectorAll('.tab-btn');
+        btns.forEach(b => b.classList.remove('active'));
+
+        container.querySelector('#' + tabName).classList.add('active');
+        evt.currentTarget.classList.add('active');
+      }
+    </script>
+</body>
+</html>
