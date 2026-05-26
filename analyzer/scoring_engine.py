@@ -1,31 +1,7 @@
-"""
-scoring_engine.py v7.1 — Mesin Scoring Deterministik (Rebalanced for Modern Phishing)
-======================================================================================
-Redesain v7.1 — perbaikan akurasi untuk phishing modern & forensik:
-- BARU: Bonus legitimasi (SPF/DKIM/DMARC) DIBATALKAN jika email terdeteksi sebagai Forwarded.
-- S_B tetap prioritas tertinggi (hard technical evidence)
-- S_D diperkuat: threat intelligence valid sebagai indikator phishing modern
-- S_C threshold diturunkan: phishing modern menggunakan bahasa halus
-- RAG similarity threshold realistis (HIGH >= 0.25, MEDIUM >= 0.12)
-- Dependency rule diperlunak: OSINT tetap kuat meskipun S_B == 0
-
-Formula:
-    S_total = max(min(S_A + S_B + S_C + S_D + BONUS, 100), 0)
-
-Kategori (Cap tetap):
-    S_A = 25  — Autentikasi Email (SPF, DKIM, DMARC, header)
-    S_B = 30  — Analisis URL & File (bukti teknis langsung — prioritas tertinggi)
-    S_C = 20  — Konten & Social Engineering (faktor pendukung)
-    S_D = 25  — Reputasi Domain & Redirect (threat intelligence)
-"""
-
 from urllib.parse import urlparse
 import math
 
-
-# ──────────────────────────────────────────────
 # Konstanta — Weight Rebalanced
-# ──────────────────────────────────────────────
 WEIGHTS = {
     # ═══════════════════════════════════════════
     # S_A — Autentikasi Email & Header (max 25)
@@ -271,7 +247,7 @@ def _score_urls(url_list: list, spoof: dict,
             s += WEIGHTS["double_extension"]["score"]
             flags.append(_flag("double_extension"))
 
-    return min(s, CAPS["S_B"]), flags
+    return s, flags
 
 
 # ──────────────────────────────────────────────
@@ -412,7 +388,7 @@ def _score_content(content_analysis: dict = None,
                     flags.append(_flag("rag_medium_similarity",
                                        f"{highest_sim:.0%} match [{cat_label}]"))
 
-    return min(s, CAPS["S_C"]), flags
+    return s, flags
 
 
 # ──────────────────────────────────────────────
@@ -528,12 +504,12 @@ def _score_domain_redirect(domain_info: dict,
                         flags.append(_flag("url_unreachable", f"HTTP {status}"))
                     break
 
-    # ── DEPENDENCY RULE (diperlunak) ──
+    # ── DEPENDENCY RULE ──
     raw_s = s
     if s_b_score == 0 and s > 0:
-        s = int(s * 0.8)  # Kurangi 20% saja
+        s = int(s * 0.8)  
 
-    return min(s, CAPS["S_D"]), flags
+    return s, flags
 
 
 # ──────────────────────────────────────────────
@@ -622,6 +598,36 @@ def _calculate_bonus(spoof: dict, rag_context: dict = None,
 
 
 # ──────────────────────────────────────────────
+# Flag Transparansi Capping
+# ──────────────────────────────────────────────
+def _cap_flag(category: str, raw_score: int, capped_score: int) -> dict:
+    return {
+        "key": f"{category.lower()}_capped",
+        "category": category,
+        "label": (
+            f"Akumulasi skor {category} ({raw_score}) "
+            f"poin berada di atas batas normalisasi {capped_score}"
+        ),
+        "weight": 0,
+        "raw_score": raw_score,
+        "capped_score": capped_score,
+    }
+
+
+def _total_cap_flag(raw_total: int, final_total: int) -> dict:
+    return {
+        "key": "total_score_capped",
+        "category": "TOTAL",
+        "label": (
+            f"Nilai skor hasil perhitungan mencapai  {raw_total} "
+            f"score melebihi batas sistem "
+            f"dengan nilai akhir sistem ditampilkan sebagai {final_total}"
+        ),
+        "weight": 0,
+        "raw_score": raw_total,
+        "capped_score": final_total,
+    }
+# ──────────────────────────────────────────────
 # Confidence Level
 # ──────────────────────────────────────────────
 def _determine_confidence(s_b: int, s_c: int, s_d: int, flags: list) -> dict:
@@ -666,7 +672,6 @@ def _determine_confidence(s_b: int, s_c: int, s_d: int, flags: list) -> dict:
                            "Memerlukan verifikasi lebih lanjut untuk konfirmasi.",
         }
 
-
 # ──────────────────────────────────────────────
 # Entry Point
 # ──────────────────────────────────────────────
@@ -679,19 +684,77 @@ def calculate_score(spoof_analysis: dict,
                     content_analysis: dict = None) -> dict:
     """
     Hitung skor risiko secara deterministik (v7.1 Rebalanced).
-    S_total = max(min(S_A + S_B + S_C + S_D + BONUS, 100), 0)
+    S_total = max(min(RAW_S_A + RAW_S_B + RAW_S_C + RAW_S_D + BONUS, 100), 0)
     """
-    s_a, f_a = _score_auth(spoof_analysis, rag_context)
-    s_b, f_b = _score_urls(url_analysis, spoof_analysis, attachment_analysis)
-    s_c, f_c = _score_content(content_analysis, rag_context, spoof_analysis)
-    s_d, f_d = _score_domain_redirect(domain_info, redirect_results, s_b_score=s_b)
 
-    bonus, bonus_flags = _calculate_bonus(spoof_analysis, rag_context, content_analysis)
+    # ──────────────────────────────────────────────
+    # RAW SCORE
+    # ──────────────────────────────────────────────
+    raw_s_a, f_a = _score_auth(spoof_analysis, rag_context)
+    raw_s_b, f_b = _score_urls(
+        url_analysis,
+        spoof_analysis,
+        attachment_analysis
+    )
+    raw_s_c, f_c = _score_content(
+        content_analysis,
+        rag_context,
+        spoof_analysis
+    )
+    raw_s_d, f_d = _score_domain_redirect(
+        domain_info,
+        redirect_results,
+        s_b_score=raw_s_b
+    )
 
-    raw_total = s_a + s_b + s_c + s_d
-    total = max(min(raw_total + bonus, 100), 0)
+    # ──────────────────────────────────────────────
+    # CATEGORY CAPPING (Hanya untuk Display Breakdown)
+    # ──────────────────────────────────────────────
+    s_a = min(raw_s_a, CAPS["S_A"])
+    s_b = min(raw_s_b, CAPS["S_B"])
+    s_c = min(raw_s_c, CAPS["S_C"])
+    s_d = min(raw_s_d, CAPS["S_D"])
 
-    # Status threshold (rebalanced)
+    # Transparansi capping per kategori
+    if raw_s_a > CAPS["S_A"]:
+        f_a.append(_cap_flag("S_A", raw_s_a, s_a))
+
+    if raw_s_b > CAPS["S_B"]:
+        f_b.append(_cap_flag("S_B", raw_s_b, s_b))
+
+    if raw_s_c > CAPS["S_C"]:
+        f_c.append(_cap_flag("S_C", raw_s_c, s_c))
+
+    if raw_s_d > CAPS["S_D"]:
+        f_d.append(_cap_flag("S_D", raw_s_d, s_d))
+
+    # ──────────────────────────────────────────────
+    # BONUS
+    # ──────────────────────────────────────────────
+    bonus, bonus_flags = _calculate_bonus(
+        spoof_analysis,
+        rag_context,
+        content_analysis
+    )
+
+    # ──────────────────────────────────────────────
+    # TOTAL SCORE (Dihitung dari RAW Asli)
+    # ──────────────────────────────────────────────
+    # Perbaikan Final: Menggunakan raw_s_* murni untuk mempertahankan sisa skor luapan
+    raw_total = raw_s_a + raw_s_b + raw_s_c + raw_s_d + bonus
+
+    # Final score dibatasi mentok di 100 (atau minimal 0)
+    total = max(min(raw_total, 100), 0)
+
+    # Transparansi total capping
+    if raw_total > 100:
+        bonus_flags.append(
+            _total_cap_flag(raw_total, total)
+        )
+
+    # ──────────────────────────────────────────────
+    # STATUS
+    # ──────────────────────────────────────────────
     if total <= 30:
         status, warna = "AMAN", "green"
     elif total <= 60:
@@ -699,16 +762,54 @@ def calculate_score(spoof_analysis: dict,
     else:
         status, warna = "BERBAHAYA", "red"
 
+    # ──────────────────────────────────────────────
+    # FLAGS
+    # ──────────────────────────────────────────────
     all_flags = f_a + f_b + f_c + f_d + bonus_flags
 
     # Confidence level
-    confidence = _determine_confidence(s_b, s_c, s_d, all_flags)
+    confidence = _determine_confidence(
+        s_b,
+        s_c,
+        s_d,
+        all_flags
+    )
 
+    # ──────────────────────────────────────────────
+    # BREAKDOWN
+    # ──────────────────────────────────────────────
     breakdown = {
-        "S_A": {"label": "Autentikasi Email & Header",        "score": s_a, "max": CAPS["S_A"], "flags": f_a},
-        "S_B": {"label": "Analisis URL & File (Teknis)",      "score": s_b, "max": CAPS["S_B"], "flags": f_b},
-        "S_C": {"label": "Konten & Social Engineering",        "score": s_c, "max": CAPS["S_C"], "flags": f_c},
-        "S_D": {"label": "Reputasi Domain & Redirect",        "score": s_d, "max": CAPS["S_D"], "flags": f_d},
+        "S_A": {
+            "label": "Autentikasi Email & Header",
+            "score": s_a,
+            "raw_score": raw_s_a,
+            "max": CAPS["S_A"],
+            "flags": f_a
+        },
+
+        "S_B": {
+            "label": "Analisis URL & File (Teknis)",
+            "score": s_b,
+            "raw_score": raw_s_b,
+            "max": CAPS["S_B"],
+            "flags": f_b
+        },
+
+        "S_C": {
+            "label": "Konten & Social Engineering",
+            "score": s_c,
+            "raw_score": raw_s_c,
+            "max": CAPS["S_C"],
+            "flags": f_c
+        },
+
+        "S_D": {
+            "label": "Reputasi Domain & Redirect",
+            "score": s_d,
+            "raw_score": raw_s_d,
+            "max": CAPS["S_D"],
+            "flags": f_d
+        },
     }
 
     if bonus_flags:

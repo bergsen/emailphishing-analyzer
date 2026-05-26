@@ -265,12 +265,12 @@ def analyze():
         # ── SINKRONISASI RAG: Validasi Kategori Ancaman ──
         # Jangan jatuhkan penalti jika RAG mengklasifikasikan pola sebagai "safe" atau "legitimate"
         is_rag_phishing = rag_sim > 0.12 and rag_category not in ["safe", "legitimate", "unknown", "informative"]
-        is_rag_legitimate = rag_category in ["legitimate", "safe"] and rag_sim > 0.05
+        is_rag_legitimate = rag_category in ["legitimate", "safe"] and rag_sim > 0.12
 
-        # ── BONUS LEGITIMASI TF-IDF (-20): Jika RAG mendeteksi pola legit ──
+        # ── BONUS LEGITIMASI TF-IDF (-10): Jika RAG mendeteksi pola legit ──
         if is_rag_legitimate or is_disclaimer:
-            bonus_legit = -20
-            score_result["total_score"] = max(score_result["total_score"] + bonus_legit, 0)
+            bonus_legit = -10
+            score_result["total_score"] = max(score_result["total_score"] + bonus_legit, 1)
             score_result["raw_score"] = score_result["total_score"]
 
             rag_sim_pct = round(rag_sim * 100, 1)
@@ -323,7 +323,7 @@ def analyze():
             flag_tambahan = {
                 "key": "manual_text_penalty",
                 "category": "PENALTI",
-                "label": f"Penalti TF-IDF Phishing: manual teks disinkronkan dengan Database RAG ({rag_sim_pct}% mirip pola {kategori_rag})",
+                "label": f"Penalti TF-IDF Phishing: teks disinkronkan dengan Database RAG ({rag_sim_pct}% mirip pola {kategori_rag})",
                 "weight": injeksi_skor
             }
 

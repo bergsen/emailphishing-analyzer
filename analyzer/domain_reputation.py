@@ -196,7 +196,7 @@ def get_domain_info(url: str) -> dict:
     except Exception:
         info["whois_status"] = "Gagal (WHOIS Port 43)"
 
-    # 3. FALLBACK 1: NetworkCalc API (HTTP 443 - Sangat Stabil)
+    # 3. FALLBACK 1: NetworkCalc API
     if info["domain_age"] == "-":
         try:
             nc_resp = requests.get(f"https://networkcalc.com/api/dns/whois/{domain}", timeout=8)

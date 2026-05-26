@@ -1,11 +1,3 @@
-"""
-llm_evaluator.py v6.0 — Single Call AI Evaluator (Token Optimized & 100% Synchronized)
-=====================================================================================
-- Menggunakan SATU kali pemanggilan API untuk menghemat Token (Boros API Fix).
-- AI menghasilkan narasi utama sekaligus narasi semantik TF-IDF agar 100% selaras.
-- Mempertahankan model "gemini-3.1-flash-lite-preview" sesuai permintaan.
-"""
-
 import os
 import json
 import re
@@ -28,7 +20,7 @@ def generate_narrative(email_text: str,
         genai.configure(api_key=api_key)
         # Sesuai permintaan: Dibiarkan gemini-3.1-flash-lite-preview
         model = genai.GenerativeModel(
-            "gemini-3.1-flash-lite-preview",
+            "gemini-2.5-flash",
             generation_config={"response_mime_type": "application/json"}
         )
 
@@ -44,7 +36,7 @@ def generate_narrative(email_text: str,
 
         primary_domain = domain_info.get("primary", domain_info)
 
-        # Snippet email_text dimasukkan agar AI bisa melakukan penalaran semantik (TF-IDF)
+        # Snippet email_text dimasukkan agar AI bisa melakukan penalaran
         context = {
             "cuplikan_isi_email_asli": email_text[:1200], 
             "skor_total": score_result["total_score"],
@@ -86,12 +78,12 @@ def generate_narrative(email_text: str,
 
         prompt = f"""
         Anda adalah Analis Keamanan Siber senior.
-        Sistem skoring deterministik telah mengevaluasi email ini dengan status "{score_result['status']}" dan skor {score_result['total_score']}/100.
+        Sistem skoring deterministik (berbasis teknis) telah mengevaluasi email ini dengan status "{score_result['status']}" dan skor {score_result['total_score']}/100.
         SISTEM SCORING MENGGUNAKAN 4 KATEGORI:
-        - S_A: Autentikasi Email & Header (SPF, DKIM, DMARC, domain mismatch, Reply-To, Received hops)
-        - S_B: Analisis URL & File (encoding, punycode, ekstensi, attachment, subdomain palsu)
-        - S_C: Konten & Social Engineering (pola manipulasi, permintaan kredensial, RAG similarity)
-        - S_D: Reputasi Domain & Redirect (OSINT, VirusTotal, AbuseIPDB, redirect chain)
+        - S_A: Autentikasi Email & Header
+        - S_B: Analisis URL & File
+        - S_C: Konten & Social Engineering
+        - S_D: Reputasi Domain & Redirect
 
         KONTEKS FORENSIK:
         {json.dumps(context, ensure_ascii=False, indent=2)}
@@ -99,41 +91,36 @@ def generate_narrative(email_text: str,
         {content_section}
 
         TUGAS ANDA:
-        Berdasarkan SEMUA data di atas (scoring + RAG + konten + attachment + url + domain + redirect), hasilkan narasi penjelasan.
-        Hasilkan output berformat JSON yang MENDUKUNG DAN SELARAS dengan status "{score_result['status']}". 
-        DILARANG KERAS memberikan analisis yang bertentangan dengan status tersebut.
+        Berdasarkan SEMUA data di atas, hasilkan output berformat JSON. 
+        Meskipun Anda mengacu pada status deterministik "{score_result['status']}", Anda memiliki wewenang analitis untuk menambahkan PERINGATAN jika mendeteksi anomali yang lolos dari skoring teknis (misalnya rekayasa sosial atau teks salinan/copy-paste).
 
         Format JSON yang WAJIB dihasilkan:
         {{
           "saran": " ATURAN SARAN BERDASARKAN STATUS:
 - Jika status = "AMAN" (skor ≤ 25):
-  * WAJIB dimulai dengan: "Email ini teridentifikasi AMAN..." atau "Email ini sah..."
-  * DILARANG KERAS menyarankan "hapus email" atau "jangan buka" atau kata negatif lain.
-  * Jelaskan mengapa email ini aman (autentikasi lengkap, domain terpercaya, dsb).
-  * Jika ada sedikit temuan minor di S_C (kata kunci SE yg kebetulan cocok), jelaskan bahwa
-    ini adalah konteks wajar (misal: email resmi bank memang menyebut "PIN/OTP" sebagai edukasi,
-    bukan sebagai teknik phishing). Kata kunci SE bisa muncul di email sah.
-  * Boleh tutup dengan saran umum berhati-hati sebagai standar keamanan.
+  * Mulai dengan menjelaskan mengapa sistem teknis menganggapnya aman (misal: tidak ada link bahaya, domain terautentikasi).
+  * NAMUN, lakukan pengecekan silang! Jika isi teks meminta data sensitif, uang, atau menggunakan bahasa mendesak, WAJIB tambahkan paragraf baru berawalan: '⚠️ CATATAN KEHATI-HATIAN: Meskipun secara teknis email ini bersih, gaya bahasanya menyerupai rekayasa sosial. Jangan berikan kredensial atau klik tautan apa pun.'
 
 - Jika status = "MENCURIGAKAN" (skor 30–65):
-  * WAJIB dimulai dengan: "Email ini terdeteksi MENCURIGAKAN..." atau "Waspadai email ini..."
-  * Jelaskan indikator yang memicunya dan sarankan verifikasi lebih lanjut.
-  * Jangan langsung menyuruh hapus — sarankan konfirmasi melalui saluran resmi.
+  * Mulai dengan: 'Waspadai email ini...'
+  * Jelaskan indikator anehnya secara sederhana dan sarankan konfirmasi ke instansi resmi melalui jalur luar (jangan balas email).
 
 - Jika status = "BERBAHAYA" (skor ≥ 66):
-  * WAJIB dimulai dengan: "Segera hapus email ini..." atau "Email ini BERBAHAYA..."
-  * Berikan peringatan keras dan sarankan tindakan pencegahan spesifik.
-  * Sebutkan risiko (pencurian data, malware, social engineering)."
+  * Mulai dengan: 'Email ini BERBAHAYA...'
+  * Berikan peringatan keras dan sarankan penghapusan atau pemblokiran. Sebutkan risiko pastinya."
 
           "rincian": [        
-ATURAN RINCIAN:
-"rincian: Array 4 string. Masing-masing TEPAT satu kalimat analitis sesuai kategori scoring:",
-"rincian[0]: [S_A] Temuan autentikasi (SPF/DKIM/DMARC/mismatch/Reply-To/Received chain/Received Hops/Autentikasi (Raw)/Kesamaan Domain)",
+"rincian[0]: [S_A] Temuan autentikasi (SPF/DKIM/DMARC/mismatch/Reply-To/Received chain)",
 "rincian[1]: [S_B] Temuan URL & file (encoding, punycode, ekstensi, brand, attachment)",
 "rincian[2]: [S_C] Temuan konten & social engineering (pola manipulasi, RAG similarity)",
-"rincian[3]: [S_D] Temuan reputasi domain + redirect (VirusTotal, AbuseIPDB, Urlscan.io, shodan.io, redirect chain)."
+"rincian[3]: [S_D] Temuan reputasi domain + redirect (VirusTotal, AbuseIPDB, Urlscan, Shodan, redirect chain)."
           ],
-          "analisis_semantik_rag": "Dua paragraf penjelasan ringkas mendalam (Gunakan Markdown) khusus untuk halaman Analisis TF-IDF. Misi Anda adalah membedah makna email asli vs pola database RAG. JIKA status email AMAN namun RAG menemukan kemiripan, ANDA WAJIB membela email tersebut dengan menjelaskan bahwa TF-IDF mengalami 'False Positive' karena kecocokan kata-kata umum yang buta konteks dan berikan jawaban seharusnya yang benar kategorinya jika diluar konteks email yang dimasukan karena TF_IDF kurang akurat. JIKA status BERBAHAYA, jelaskan letak persamaan taktik penipuannya jika email asli dan pola phishing KB sesuai konteks."
+          
+          "analisis_semantik_rag": "Dua paragraf penjelasan ringkas mendalam (Gunakan Markdown). 
+ATURAN ANALISIS RAG: 
+1. EVALUASI HASIL RAG: Anda WAJIB membandingkan kategori dari RAG Database (kaggle_kb.json) dengan makna sebenarnya dari 'cuplikan_isi_email_asli'.Lakukan CROSS-REFERENCE (Cek Silang). Bandingkan nama entitas di dalam teks email asli dengan nama 'domain_pengirim'. 
+2. KOREKSI FALSE POSITIVE (Email Legit dituduh Phishing): Jika status email 'AMAN' namun RAG menuduhnya sebagai 'spear_phishing' atau ancaman lain (seperti kasus notifikasi reset password GitHub yang sah), Anda WAJIB menyatakan bahwa ini adalah 'False Positive pada algoritma TF-IDF'. Jelaskan bahwa RAG tertipu oleh kesamaan kosa kata teknis (misal: 'password', 'reset') yang lumrah digunakan dalam notifikasi sistem yang sah. Jika teks email berpura-pura menjadi institusi besar (misal: Bank, Kampus, Perusahaan) TETAPI dikirim menggunakan domain publik (seperti @gmail.com) atau domain acak, MAKA JELASKAN bahwa penipu bisa saja menyalin (copy-paste) teks resmi untuk mengelabui korban.
+3. VALIDASI TRUE POSITIVE: Jika status 'BERBAHAYA' dan kategori RAG memang cocok dengan isi teks scam, jelaskan taktik manipulasi psikologis apa yang sedang digunakan pelaku berdasarkan pola di database. Jangan pernah membela email scam. Jika RAG menemukan kemiripan tinggi dengan database phishing, jelaskan taktik apa yang sedang dicoba oleh pelaku berdasarkan pola kemiripan tersebut. Jika Sama-sama Aman jelaskan bahwa teks tersebut memang bahasa korespondensi wajar tanpa manipulasi"
         }}
         """
         

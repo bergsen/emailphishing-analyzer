@@ -1,15 +1,3 @@
-"""
-redirect_trace.py v3.2
-=======================
-Perbaikan v3.2:
-- Trace SEMUA URL (bukan hanya URL pertama)
-- SSL verification dengan fallback (bukan disabled)
-- Timeout yang lebih baik
-- Deteksi redirect chain yang terlalu panjang
-- Penanganan URI lokal (data/javascript) dan penambahan HTTP scheme otomatis.
-- BARU: Penambahan fitur 'Human-Readable Explanations' (penjelasan bahasa awam).
-"""
-
 import requests
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed

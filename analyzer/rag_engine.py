@@ -1,14 +1,3 @@
-"""
-rag_engine.py v12.1 — RAG Engine (Pure TF-IDF with Deep Sanitization)
-====================================================================================
-ARSITEKTUR MURNI & ANTI-NOISE:
-- EML Parser: Mendukung ekstraksi text/plain dan text/html secara sempurna.
-- Anti-Base64: Membuang kata > 20 karakter untuk mencegah hash & base64 masuk vektor.
-- MIME & SMTP Stopwords: Membasmi "contenttype", "smtp", "deliveredto", dll.
-- TANPA INJEKSI PAKSA: TF-IDF murni statistik namun dengan data yang higienis!
-- N-GRAM: Mendukung Unigram (1 kata) dan Bigram (2 kata) sekaligus untuk konteks maksimal.
-"""
-
 import os
 import re
 import json
@@ -182,7 +171,7 @@ LEGITIMATE_SENDERS = {
     "outlook.com", "hotmail.com", "live.com", "apple.com", "icloud.com",
     "yahoo.com", "facebook.com", "facebookmail.com", "instagram.com",
     "meta.com", "twitter.com", "x.com", "linkedin.com", "github.com",
-    "gitlab.com", "slack.com", "discord.com", "shopee.co.id", "shopee.co.id",
+    "gitlab.com", "slack.com", "discord.com", "shopee.co.id", "shopee.com",
     "tokopedia.com", "bukalapak.com", "lazada.co.id", "blibli.com",
     "amazon.com", "ebay.com", "bca.co.id", "klikbca.com", "bni.co.id",
     "bri.co.id", "bankmandiri.co.id", "gopay.co.id", "gojek.com",
@@ -288,7 +277,7 @@ def _init_vectorizer():
     _kb_matrix = _vectorizer.fit_transform(kb_texts)
 
 def search_similar_patterns(email_text: str, top_k: int = 5) -> list:
-    """Murni TF-IDF Cosine tanpa injeksi paksa dengan Deterministik Sort."""
+    """Murni TF-IDF Cosine."""
     _init_vectorizer()
     if _vectorizer is None or _kb_matrix is None: return []
 
@@ -366,7 +355,7 @@ def compute_tfidf_details(email_text: str) -> dict:
                 "risk": entry.get("risk", "TINGGI"), "similarity": round(sim, 6), "similarity_pct": round(sim * 100, 2),
             })
             
-        # TIE-BREAKER: 1. Urutkan berdasarkan similarity tertinggi, 2. Jika sama, urutkan berdasarkan ID (A-Z)
+        # TIE-BREAKER: 1. Urutkan berdasarkan similarity tertinggi, 2. jika sama pakai id
         all_patterns.sort(key=lambda x: (-x["similarity"], x.get("id", "")))
         top_pattern = all_patterns[0] if all_patterns else None
 
@@ -380,7 +369,7 @@ def compute_tfidf_details(email_text: str) -> dict:
             "cleaned_query": cleaned_email[:500], "detailed_steps": detailed_steps,
             "se_categories": se_categories, "total_vocabulary_size": len(feature_names),
             "all_patterns": all_patterns, "top_pattern": top_pattern,
-            "max_similarity_pct": round(float(max(similarities)) * 100, 2),
+            "max_similarity_pct": round(float(max(similarities)) * 100, 2) if len(similarities) > 0 else 0,
             "kb_total_patterns": len(PHISHING_KNOWLEDGE_BASE)
         }
     except Exception as e:

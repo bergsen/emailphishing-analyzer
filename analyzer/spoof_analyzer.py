@@ -282,15 +282,14 @@ def analyze_headers(raw_email_text: str) -> dict:
         auth_summary = "VALID & AMAN"
         auth_class = "text-success"
 
-   # =====================================================================
-    # 🚀 DETEKSI EMAIL FORWARDED & EKSTRAKSI PENGIRIM ASLI (FORENSIK)
-    # =====================================================================
+    # DETEKSI EMAIL FORWARDED & EKSTRAKSI PENGIRIM ASLI (FORENSIK)
+
     is_forwarded = False
     forward_indicators = []
     original_sender = None
     original_domain = None
 
-    # 1. Dekode isi pesan agar bisa dibaca Regex (menangani Base64/Quoted-Printable di .eml)
+    # 1. Dekode isi pesan agar bisa dibaca Regex
     decoded_body = raw_email_text
     if msg.is_multipart() or msg.get_payload():
         try:
